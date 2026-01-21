@@ -19,15 +19,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Compile the sketch (verify syntax and generate binary)
 arduino-cli compile --fqbn arduino:avr:leonardo .
 
-# Find the Leonardo's port (look for /dev/cu.usbmodem*)
+# Find the Beetle's port (look for /dev/cu.usbmodem*)
 arduino-cli board list
 
-# Upload to Arduino Leonardo
+# Upload to DFRobot Beetle
 arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
 
 # Compile and upload in one command
 arduino-cli compile --fqbn arduino:avr:leonardo . && arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
 ```
+
+**Note**: On Apple Silicon (ARM64), the AVR toolchain lacks native support. Use an x64 platform or Docker/VM.
 
 ### Serial Monitor
 
@@ -56,15 +58,15 @@ arduino-cli lib list
 
 ### Core Components
 
-**src/arduXT.ino**: Monolithic sketch containing all logic. The architecture is organized into functional blocks:
+**arduXT.ino**: Monolithic sketch containing all logic. The architecture is organized into functional blocks:
 
-1. **Pin Definitions** (src/arduXT.ino:19-20)
+1. **Pin Definitions** (arduXT.ino:19-20)
    - `XT_CLK_PIN`: Clock signal output (Pin 9)
    - `XT_DATA_PIN`: Data signal output (Pin 10)
    - **Important**: Pins 9 and 10 chosen because they are general-purpose digital I/O on Beetle
    - Pins 2/3 are reserved for I2C (SDA/SCL) and should not be used
 
-2. **Protocol Timing** (src/arduXT.ino:23)
+2. **Protocol Timing** (arduXT.ino:23)
    - `XT_CLK_HALF_PERIOD`: Defines clock frequency (~12.5 kHz default)
 
 3. **Serial Input Handler** (in `loop()`)
@@ -141,7 +143,7 @@ If compatibility issues arise with specific PC/XT systems:
 ### Pin Configuration Changes
 
 If you need to reassign pins:
-- Update `XT_CLK_PIN` and `XT_DATA_PIN` definitions in src/arduXT.ino
+- Update `XT_CLK_PIN` and `XT_DATA_PIN` definitions in arduXT.ino
 - Only use pins 9, 10, or 11 for general GPIO
 - Current assignment (9, 10) leaves pin 11 free for expansion
 
@@ -186,10 +188,10 @@ arduino-cli board list
 arduino-cli core list
 
 # Compile with verbose output
-arduino-cli compile --fqbn arduino:avr:leonardo src/ --verbose
+arduino-cli compile --fqbn arduino:avr:leonardo . --verbose
 
 # Upload with verbose output
-arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo src/ --verbose
+arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo . --verbose
 ```
 
 **Common Issues**:
@@ -202,12 +204,11 @@ arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo src/ --v
 ```
 arduXT/
 ├── .gitignore          # Git ignore patterns
+├── arduXT.ino          # Main sketch (all code in one file)
 ├── CLAUDE.md           # This file
-├── README.md           # User documentation, wiring diagrams
-└── src/
-    └── arduXT.ino      # Main sketch (all code in one file)
+└── README.md           # User documentation, wiring diagrams
 ```
 
 This project uses a single-file Arduino sketch architecture. For future expansion with multiple files:
-- Create `.cpp`/`.h` files in the `src/` directory
+- Create `.cpp`/`.h` files in the same directory as arduXT.ino
 - Arduino IDE automatically includes them in compilation
