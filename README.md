@@ -100,11 +100,11 @@ Look for a port like `/dev/cu.usbmodem*` with board type "Arduino Leonardo".
 ### 4. Compile and Upload
 
 ```bash
-# Compile the sketch
-arduino-cli compile --fqbn arduino:avr:leonardo .
+# Compile the sketch (from project root)
+arduino-cli compile --fqbn arduino:avr:leonardo src/
 
 # Upload to Leonardo (replace PORT with your actual port)
-arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo src/
 ```
 
 ## Usage
@@ -181,7 +181,7 @@ The XT protocol typically uses 10-16 kHz. The default is ~12.5 kHz. To adjust:
 #define XT_CLK_HALF_PERIOD 40  // 80us period = 12.5 kHz
 ```
 
-Change this value in `arduXT.ino`:
+Change this value in `src/arduXT.ino`:
 - Increase for slower clock (e.g., 50 = 10 kHz)
 - Decrease for faster clock (e.g., 31 = 16 kHz)
 
