@@ -53,13 +53,13 @@ arduino-cli lib list
 
 ### Core Components
 
-**arduXT.ino**: Monolithic sketch containing all logic. The architecture is organized into functional blocks:
+**src/arduXT.ino**: Monolithic sketch containing all logic. The architecture is organized into functional blocks:
 
-1. **Pin Definitions** (lines 14-15)
+1. **Pin Definitions** (src/arduXT.ino:14-15)
    - `XT_CLK_PIN`: Clock signal output (Pin 2)
    - `XT_DATA_PIN`: Data signal output (Pin 3)
 
-2. **Protocol Timing** (line 18)
+2. **Protocol Timing** (src/arduXT.ino:18)
    - `XT_CLK_HALF_PERIOD`: Defines clock frequency (~12.5 kHz default)
 
 3. **Serial Input Handler** (in `loop()`)
@@ -168,11 +168,13 @@ arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo . --verb
 
 ```
 arduXT/
-├── arduXT.ino          # Main sketch (all code in one file)
+├── .gitignore          # Git ignore patterns
+├── CLAUDE.md           # This file
 ├── README.md           # User documentation, wiring diagrams
-└── CLAUDE.md           # This file
+└── src/
+    └── arduXT.ino      # Main sketch (all code in one file)
 ```
 
 This project uses a single-file Arduino sketch architecture. For future expansion with multiple files:
-- Create `.cpp`/`.h` files in the same directory
+- Create `.cpp`/`.h` files in the `src/` directory
 - Arduino IDE automatically includes them in compilation
