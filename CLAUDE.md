@@ -4,9 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**arduXT** is an Arduino Leonardo-based XT keyboard emulator that translates USB Serial input into IBM PC/XT keyboard protocol signals. The Arduino acts as a bridge between modern computers and vintage PC/XT systems that require 5-pin DIN keyboard connectors.
+**arduXT** is a DFRobot Beetle-based XT keyboard emulator that translates USB Serial input into IBM PC/XT keyboard protocol signals. The Beetle acts as a bridge between modern computers and vintage PC/XT systems that require 5-pin DIN keyboard connectors.
 
-**Target Hardware**: Arduino Leonardo (ATmega32U4)
+**Target Hardware**: DFRobot Beetle (ATmega32U4, Leonardo-compatible)
+- **Wiki**: https://wiki.dfrobot.com/Beetle_SKU_DFR0282
+- **Dimensions**: 20mm x 22mm x 3.8mm
+- **Bootloader**: Arduino Leonardo (use `arduino:avr:leonardo` FQBN)
 
 ## Common Commands
 
@@ -55,11 +58,13 @@ arduino-cli lib list
 
 **src/arduXT.ino**: Monolithic sketch containing all logic. The architecture is organized into functional blocks:
 
-1. **Pin Definitions** (src/arduXT.ino:14-15)
-   - `XT_CLK_PIN`: Clock signal output (Pin 2)
-   - `XT_DATA_PIN`: Data signal output (Pin 3)
+1. **Pin Definitions** (src/arduXT.ino:19-20)
+   - `XT_CLK_PIN`: Clock signal output (Pin 9)
+   - `XT_DATA_PIN`: Data signal output (Pin 10)
+   - **Important**: Pins 9 and 10 chosen because they are general-purpose digital I/O on Beetle
+   - Pins 2/3 are reserved for I2C (SDA/SCL) and should not be used
 
-2. **Protocol Timing** (src/arduXT.ino:18)
+2. **Protocol Timing** (src/arduXT.ino:23)
    - `XT_CLK_HALF_PERIOD`: Defines clock frequency (~12.5 kHz default)
 
 3. **Serial Input Handler** (in `loop()`)
@@ -115,29 +120,52 @@ If compatibility issues arise with specific PC/XT systems:
 2. Modify key press duration in `loop()` (currently 50ms)
 3. Test with oscilloscope if available to verify signal timing
 
-### Pin Configuration
+### DFRobot Beetle Pin Configuration
 
-Current assignment uses digital pins 2-3. If conflicts arise with shields or other hardware:
-- Update `XT_CLK_PIN` and `XT_DATA_PIN` definitions
-- Avoid pins 0-1 (hardware serial), 13 (built-in LED), or pins with special functions
+**Available Pins** (10 total digital I/O):
+- **Pin 0 (RX)**: Serial receive - avoid for GPIO
+- **Pin 1 (TX)**: Serial transmit - avoid for GPIO
+- **Pin 2 (SDA)**: I2C data - avoid for GPIO
+- **Pin 3 (SCL)**: I2C clock - avoid for GPIO (also PWM)
+- **Pin 9**: General purpose digital I/O (PWM) - **Used for XT_CLK**
+- **Pin 10**: General purpose digital I/O (PWM) - **Used for XT_DATA**
+- **Pin 11**: General purpose digital I/O (PWM) - available if needed
 
-### Leonardo-Specific Considerations
+**Analog Pins**: A0, A1, A2, A9, A10
+
+**Critical Constraints**:
+- Only pins 9, 10, 11 are safe for general-purpose GPIO
+- Pins 2/3 are hardwired for I2C on Beetle; using them may cause conflicts
+- Pin 13 (built-in LED on Leonardo) is not broken out on Beetle
+
+### Pin Configuration Changes
+
+If you need to reassign pins:
+- Update `XT_CLK_PIN` and `XT_DATA_PIN` definitions in src/arduXT.ino
+- Only use pins 9, 10, or 11 for general GPIO
+- Current assignment (9, 10) leaves pin 11 free for expansion
+
+### Beetle-Specific Considerations
 
 - **USB Serial**: Uses `Serial` object (built-in USB CDC)
 - **Hardware Serial**: `Serial1` available on pins 0 (RX) and 1 (TX) if needed
-- **Reset Behavior**: Leonardo requires `while (!Serial)` in `setup()` to wait for USB connection
-- **Bootloader**: Leonardo enters bootloader mode briefly on USB connection; may require reset before upload
+- **Reset Behavior**: Beetle requires `while (!Serial)` in `setup()` to wait for USB connection
+- **Bootloader**: Beetle enters bootloader mode briefly on USB connection; may require reset before upload
+- **Power**: 4.5-5V only; **6V will damage the board**
+- **Form Factor**: Ultra-compact (20mm x 22mm) with gold-plated VCC/GND pads for power
 
 ## Testing
 
 ### Manual Testing
 
-1. Upload sketch to Leonardo
+1. Upload sketch to Beetle
 2. Connect serial monitor at 9600 baud
 3. Type characters and verify:
    - Characters are echoed back
    - No errors or warnings
 4. Connect to PC/XT and verify keyboard signals with logic analyzer or actual system response
+
+**Note**: Beetle may require pressing reset button before upload if not recognized
 
 ### Signal Verification
 
@@ -151,18 +179,23 @@ Use a logic analyzer or oscilloscope to verify:
 ## Troubleshooting Commands
 
 ```bash
-# Check if Leonardo is detected
+# Check if Beetle is detected (appears as Leonardo)
 arduino-cli board list
 
 # Verify core is installed
 arduino-cli core list
 
 # Compile with verbose output
-arduino-cli compile --fqbn arduino:avr:leonardo . --verbose
+arduino-cli compile --fqbn arduino:avr:leonardo src/ --verbose
 
 # Upload with verbose output
-arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo . --verbose
+arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo src/ --verbose
 ```
+
+**Common Issues**:
+- Beetle not detected: Try pressing reset button, then run upload within 8 seconds
+- Port disappears: Beetle enters bootloader briefly on connection
+- Upload fails: Verify power is 4.5-5V (not 6V or higher)
 
 ## Project Structure
 

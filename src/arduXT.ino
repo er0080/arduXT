@@ -1,8 +1,11 @@
 /*
- * arduXT - XT Keyboard Emulator for Arduino Leonardo
+ * arduXT - XT Keyboard Emulator for DFRobot Beetle
  *
  * Receives keystrokes via USB Serial and outputs XT keyboard protocol
  * signals over GPIO pins for use with vintage IBM PC/XT computers.
+ *
+ * Target Hardware: DFRobot Beetle (ATmega32u4, Leonardo-compatible)
+ * Board: https://wiki.dfrobot.com/Beetle_SKU_DFR0282
  *
  * XT Protocol:
  * - Clock frequency: ~10-16 kHz
@@ -11,8 +14,10 @@
  */
 
 // XT Keyboard Protocol Pins
-#define XT_CLK_PIN   2  // Clock signal to PC
-#define XT_DATA_PIN  3  // Data signal to PC
+// Using pins 9 and 10 (general purpose digital I/O on Beetle)
+// Note: Pins 2/3 are I2C (SDA/SCL) and should be avoided
+#define XT_CLK_PIN   9   // Clock signal to PC
+#define XT_DATA_PIN  10  // Data signal to PC
 
 // XT Protocol Timing (microseconds)
 #define XT_CLK_HALF_PERIOD 40  // ~12.5 kHz clock (80us full period)

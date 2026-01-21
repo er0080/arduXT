@@ -1,6 +1,6 @@
 # arduXT - XT Keyboard Emulator
 
-An Arduino Leonardo-based XT keyboard emulator that receives keystrokes via USB Serial and outputs IBM PC/XT compatible keyboard signals. This allows modern computers to send keystrokes to vintage IBM PC/XT systems that require a 5-pin DIN keyboard connector.
+A DFRobot Beetle-based XT keyboard emulator that receives keystrokes via USB Serial and outputs IBM PC/XT compatible keyboard signals. This allows modern computers to send keystrokes to vintage IBM PC/XT systems that require a 5-pin DIN keyboard connector.
 
 ## Features
 
@@ -9,13 +9,22 @@ An Arduino Leonardo-based XT keyboard emulator that receives keystrokes via USB 
 - ASCII to XT scancode mapping for letters, numbers, and common punctuation
 - Precise timing for XT protocol compatibility (~12.5 kHz clock)
 - Make and break code generation for proper key press/release simulation
+- Ultra-compact form factor (20mm x 22mm)
 
 ## Hardware Requirements
 
-- **Arduino Leonardo** (ATmega32U4)
+- **DFRobot Beetle** (ATmega32U4, Leonardo-compatible)
+  - Board info: https://wiki.dfrobot.com/Beetle_SKU_DFR0282
+  - Dimensions: 20mm x 22mm x 3.8mm
 - **5-pin DIN connector** (for PC/XT keyboard port)
 - **Jumper wires**
 - **Resistors** (optional, for level shifting if needed)
+
+### Important Power Notes
+
+- **Operating voltage**: 4.5-5V DC
+- **WARNING**: 6V will damage the board by overvoltage
+- Power via Micro USB or VCC/GND pads
 
 ## XT Keyboard Protocol
 
@@ -34,37 +43,41 @@ The IBM PC/XT keyboard uses a serial protocol with the following characteristics
 
 ## Wiring Diagram
 
-### Arduino Leonardo to XT Keyboard Port (5-pin DIN)
+### DFRobot Beetle to XT Keyboard Port (5-pin DIN)
 
 ```
-Arduino Leonardo          XT Keyboard Port (5-pin DIN)
+DFRobot Beetle            XT Keyboard Port (5-pin DIN)
                           (Looking at female connector on PC)
 
                                     ___
                                   /  5  \
                                  |4     3|
-  Pin 2 (XT_CLK) -------->        \  2  /
-  Pin 3 (XT_DATA) ------->         \ 1 /
-  5V             -------->           ¯
-  GND            -------->
+  Pin 9 (XT_CLK)  -------->        \  2  /
+  Pin 10 (XT_DATA) ------->         \ 1 /
+  VCC (+)         -------->           ¯
+  GND (-)         -------->
 
-Pin 1: Clock (from Arduino Pin 2)
-Pin 2: Data  (from Arduino Pin 3)
+Pin 1: Clock (from Beetle Pin 9)
+Pin 2: Data  (from Beetle Pin 10)
 Pin 3: Reset (leave unconnected or tie to +5V via 10K resistor)
 Pin 4: Ground
-Pin 5: +5V (Power - can power Arduino or provide from Arduino)
+Pin 5: +5V (Power - can power Beetle or provide from Beetle)
 ```
 
 ### Pin Connections
 
-| Arduino Pin | XT Signal | DIN Pin | Description |
-|-------------|-----------|---------|-------------|
-| D2          | Clock     | 1       | Clock signal (~12.5 kHz) |
-| D3          | Data      | 2       | Serial data signal |
-| 5V          | +5V       | 5       | Power (optional) |
-| GND         | Ground    | 4       | Common ground |
+| Beetle Pin | XT Signal | DIN Pin | Description |
+|------------|-----------|---------|-------------|
+| D9         | Clock     | 1       | Clock signal (~12.5 kHz) |
+| D10        | Data      | 2       | Serial data signal |
+| VCC (+)    | +5V       | 5       | Power (optional, max 5V!) |
+| GND (-)    | Ground    | 4       | Common ground |
 
-**Note**: DIN Pin 3 (Reset) can be left unconnected or tied to +5V through a 10K resistor. Some systems may require this.
+**Important Notes**:
+- DIN Pin 3 (Reset) can be left unconnected or tied to +5V through a 10K resistor
+- Beetle pins 2/3 are used for I2C (SDA/SCL) and should not be used for this project
+- Pins 9, 10, 11 are the only general-purpose digital I/O pins on the Beetle
+- **Never exceed 5V** on the Beetle VCC; 6V will damage the board
 
 ## Installation & Setup
 
@@ -74,7 +87,7 @@ Pin 5: +5V (Power - can power Arduino or provide from Arduino)
 brew install arduino-cli
 ```
 
-### 2. Configure Arduino CLI for Leonardo
+### 2. Configure Arduino CLI for DFRobot Beetle
 
 ```bash
 # Initialize configuration
@@ -83,19 +96,21 @@ arduino-cli config init
 # Update core index
 arduino-cli core update-index
 
-# Install AVR core (includes Leonardo support)
+# Install AVR core (includes Leonardo support for Beetle)
 arduino-cli core install arduino:avr
 ```
 
-### 3. Connect Arduino Leonardo
+**Note**: The DFRobot Beetle uses the same bootloader as Arduino Leonardo, so use the `arduino:avr:leonardo` board identifier.
 
-Connect your Arduino Leonardo via USB. Find the port:
+### 3. Connect DFRobot Beetle
+
+Connect your DFRobot Beetle via Micro USB. Find the port:
 
 ```bash
 arduino-cli board list
 ```
 
-Look for a port like `/dev/cu.usbmodem*` with board type "Arduino Leonardo".
+Look for a port like `/dev/cu.usbmodem*` with board type "Arduino Leonardo" (Beetle is Leonardo-compatible).
 
 ### 4. Compile and Upload
 
@@ -111,7 +126,7 @@ arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo src/
 
 ### 1. Connect Hardware
 
-Wire the Arduino Leonardo to your PC/XT's keyboard port according to the wiring diagram above.
+Wire the DFRobot Beetle to your PC/XT's keyboard port according to the wiring diagram above.
 
 ### 2. Open Serial Monitor
 
@@ -213,16 +228,18 @@ Extend the `charToXTScancode()` function to support additional keys. Full XT sca
 - Check signal integrity with oscilloscope if available
 - Verify proper idle state (both lines HIGH)
 
-### Arduino not responding
-- Press reset button on Leonardo
+### Beetle not responding
+- Press reset button on Beetle (if accessible)
 - Reupload sketch
-- Check USB cable connection
+- Check Micro USB cable connection
+- Verify power supply is within 4.5-5V range
 
 ## Technical References
 
+- [DFRobot Beetle Wiki](https://wiki.dfrobot.com/Beetle_SKU_DFR0282)
 - [IBM PC/XT Keyboard Protocol](http://www.computer-engineering.org/ps2keyboard/)
 - [XT Scancode Set](https://www.avrfreaks.net/sites/default/files/PS2%20Keyboard.pdf)
-- [Arduino Leonardo Pinout](https://docs.arduino.cc/hardware/leonardo)
+- [Arduino Leonardo Pinout](https://docs.arduino.cc/hardware/leonardo) (Beetle is Leonardo-compatible)
 
 ## License
 
