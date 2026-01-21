@@ -22,16 +22,6 @@
 // XT Protocol Timing (microseconds)
 #define XT_CLK_HALF_PERIOD 40  // ~12.5 kHz clock (80us full period)
 
-// XT Scancode definitions (make codes)
-// These are sent when a key is pressed
-const uint8_t XT_SCANCODES[] = {
-  // This table will be expanded with full ASCII to XT scancode mapping
-  0x1E,  // 'A' key
-  0x30,  // 'B' key
-  0x2E,  // 'C' key
-  // ... more mappings to be added
-};
-
 void setup() {
   // Initialize GPIO pins for XT keyboard interface
   pinMode(XT_CLK_PIN, OUTPUT);
