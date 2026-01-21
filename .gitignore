@@ -1,0 +1,37 @@
+# Arduino build output
+build/
+*.hex
+*.eep
+*.elf
+*.bin
+
+# Arduino IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+._*
+
+# Editor temporary files
+*~
+*.swp
+*.swo
+*.bak
+
+# Compiled Object files
+*.o
+*.obj
+
+# Library files
+*.a
+*.lib
+
+# Debug files
+*.dSYM/
+*.su
+
+# Python (if using any helper scripts)
+__pycache__/
+*.py[cod]
+*$py.class

@@ -1,0 +1,237 @@
+# arduXT - XT Keyboard Emulator
+
+An Arduino Leonardo-based XT keyboard emulator that receives keystrokes via USB Serial and outputs IBM PC/XT compatible keyboard signals. This allows modern computers to send keystrokes to vintage IBM PC/XT systems that require a 5-pin DIN keyboard connector.
+
+## Features
+
+- Full XT keyboard protocol implementation
+- USB Serial input for easy keystroke transmission
+- ASCII to XT scancode mapping for letters, numbers, and common punctuation
+- Precise timing for XT protocol compatibility (~12.5 kHz clock)
+- Make and break code generation for proper key press/release simulation
+
+## Hardware Requirements
+
+- **Arduino Leonardo** (ATmega32U4)
+- **5-pin DIN connector** (for PC/XT keyboard port)
+- **Jumper wires**
+- **Resistors** (optional, for level shifting if needed)
+
+## XT Keyboard Protocol
+
+The IBM PC/XT keyboard uses a serial protocol with the following characteristics:
+
+- **Clock frequency**: 10-16 kHz (typically ~12.5 kHz)
+- **Data format**: 1 start bit (0) + 8 data bits (LSB first) + 1 stop bit (1)
+- **Voltage levels**: TTL (0-5V)
+- **Master**: Keyboard generates both clock and data signals
+- **Idle state**: Both clock and data lines HIGH
+
+### Scancode Format
+
+- **Make code**: Sent when key is pressed (e.g., 0x1E for 'A')
+- **Break code**: Make code + 0x80 (e.g., 0x9E for 'A' release)
+
+## Wiring Diagram
+
+### Arduino Leonardo to XT Keyboard Port (5-pin DIN)
+
+```
+Arduino Leonardo          XT Keyboard Port (5-pin DIN)
+                          (Looking at female connector on PC)
+
+                                    ___
+                                  /  5  \
+                                 |4     3|
+  Pin 2 (XT_CLK) -------->        \  2  /
+  Pin 3 (XT_DATA) ------->         \ 1 /
+  5V             -------->           ¯
+  GND            -------->
+
+Pin 1: Clock (from Arduino Pin 2)
+Pin 2: Data  (from Arduino Pin 3)
+Pin 3: Reset (leave unconnected or tie to +5V via 10K resistor)
+Pin 4: Ground
+Pin 5: +5V (Power - can power Arduino or provide from Arduino)
+```
+
+### Pin Connections
+
+| Arduino Pin | XT Signal | DIN Pin | Description |
+|-------------|-----------|---------|-------------|
+| D2          | Clock     | 1       | Clock signal (~12.5 kHz) |
+| D3          | Data      | 2       | Serial data signal |
+| 5V          | +5V       | 5       | Power (optional) |
+| GND         | Ground    | 4       | Common ground |
+
+**Note**: DIN Pin 3 (Reset) can be left unconnected or tied to +5V through a 10K resistor. Some systems may require this.
+
+## Installation & Setup
+
+### 1. Install Arduino CLI
+
+```bash
+brew install arduino-cli
+```
+
+### 2. Configure Arduino CLI for Leonardo
+
+```bash
+# Initialize configuration
+arduino-cli config init
+
+# Update core index
+arduino-cli core update-index
+
+# Install AVR core (includes Leonardo support)
+arduino-cli core install arduino:avr
+```
+
+### 3. Connect Arduino Leonardo
+
+Connect your Arduino Leonardo via USB. Find the port:
+
+```bash
+arduino-cli board list
+```
+
+Look for a port like `/dev/cu.usbmodem*` with board type "Arduino Leonardo".
+
+### 4. Compile and Upload
+
+```bash
+# Compile the sketch
+arduino-cli compile --fqbn arduino:avr:leonardo .
+
+# Upload to Leonardo (replace PORT with your actual port)
+arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+```
+
+## Usage
+
+### 1. Connect Hardware
+
+Wire the Arduino Leonardo to your PC/XT's keyboard port according to the wiring diagram above.
+
+### 2. Open Serial Monitor
+
+```bash
+# Using arduino-cli
+arduino-cli monitor -p /dev/cu.usbmodem14101 -c baudrate=9600
+
+# Or using screen
+screen /dev/cu.usbmodem14101 9600
+```
+
+### 3. Send Keystrokes
+
+Type characters in the serial terminal. Each character will be:
+1. Echoed back to the serial monitor
+2. Converted to XT scancode
+3. Transmitted to the PC/XT as a make code (key press)
+4. Followed by a break code (key release) after 50ms
+
+### Example
+
+```
+Received: H
+Received: e
+Received: l
+Received: l
+Received: o
+```
+
+The PC/XT will receive these as proper keyboard scancodes.
+
+## Supported Keys
+
+### Letters
+- A-Z (case insensitive)
+
+### Numbers
+- 0-9
+
+### Special Keys
+- Space
+- Enter
+- Backspace
+- Tab
+- Escape
+
+### Punctuation
+- `-` Minus/Hyphen
+- `=` Equals
+- `[` Left Bracket
+- `]` Right Bracket
+- `;` Semicolon
+- `'` Apostrophe
+- `` ` `` Grave Accent
+- `\` Backslash
+- `,` Comma
+- `.` Period
+- `/` Slash
+
+## Customization
+
+### Adjusting Clock Frequency
+
+The XT protocol typically uses 10-16 kHz. The default is ~12.5 kHz. To adjust:
+
+```cpp
+#define XT_CLK_HALF_PERIOD 40  // 80us period = 12.5 kHz
+```
+
+Change this value in `arduXT.ino`:
+- Increase for slower clock (e.g., 50 = 10 kHz)
+- Decrease for faster clock (e.g., 31 = 16 kHz)
+
+### Key Repeat Delay
+
+Default key press duration is 50ms. Adjust in the main loop:
+
+```cpp
+delay(50);  // Change this value
+```
+
+### Adding More Scancodes
+
+Extend the `charToXTScancode()` function to support additional keys. Full XT scancode reference:
+- Function keys (F1-F10): 0x3B-0x44
+- Cursor keys: Up (0x48), Down (0x50), Left (0x4B), Right (0x4D)
+- Modifier keys: Shift (0x2A/0x36), Ctrl (0x1D), Alt (0x38)
+
+## Troubleshooting
+
+### No response from PC/XT
+- Check wiring connections
+- Verify correct DIN pin numbering (numbering varies by DIN standard)
+- Try adjusting clock frequency
+- Ensure both Arduino and PC/XT share common ground
+
+### Garbled output
+- Clock frequency may be too fast/slow for your system
+- Check signal integrity with oscilloscope if available
+- Verify proper idle state (both lines HIGH)
+
+### Arduino not responding
+- Press reset button on Leonardo
+- Reupload sketch
+- Check USB cable connection
+
+## Technical References
+
+- [IBM PC/XT Keyboard Protocol](http://www.computer-engineering.org/ps2keyboard/)
+- [XT Scancode Set](https://www.avrfreaks.net/sites/default/files/PS2%20Keyboard.pdf)
+- [Arduino Leonardo Pinout](https://docs.arduino.cc/hardware/leonardo)
+
+## License
+
+MIT License - Feel free to modify and distribute.
+
+## Contributing
+
+Contributions welcome! Areas for improvement:
+- Extended scancode support (function keys, numpad)
+- Bidirectional communication (PC commands to keyboard)
+- Configurable pin assignments
+- EEPROM configuration storage
