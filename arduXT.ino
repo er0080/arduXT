@@ -68,10 +68,17 @@ void setup() {
 void loop() {
   // Check for escape sequence timeout
   if (escState != STATE_NORMAL && millis() > escTimeout) {
-    // Timeout - reset state machine
+    // Timeout handling
+    if (escState == STATE_ESC && escIndex == 0) {
+      // Standalone ESC key pressed
+      Serial.println("Standalone ESC key");
+      sendKey(0x01);  // ESC scancode
+    } else {
+      Serial.println("Escape sequence timeout");
+    }
+    // Reset state machine
     escState = STATE_NORMAL;
     escIndex = 0;
-    Serial.println("Escape sequence timeout");
   }
 
   // Check for incoming serial data
@@ -88,11 +95,27 @@ void loop() {
           Serial.println("ESC received");
         } else {
           // Normal character - process it
-          Serial.print("Char: ");
-          Serial.println(incomingChar);
+          Serial.print("Char: 0x");
+          Serial.println((uint8_t)incomingChar, HEX);
 
+          // Check for Ctrl sequences (Ctrl+A through Ctrl+Z = 0x01-0x1A)
+          if (incomingChar >= 0x01 && incomingChar <= 0x1A) {
+            // Ctrl+letter detected
+            char letter = incomingChar + 'a' - 1;  // Convert to lowercase letter
+            uint8_t baseCode = charToXTScancode(letter);
+            if (baseCode != 0) {
+              Serial.print("Ctrl+");
+              Serial.println(letter);
+              // Send Ctrl+key sequence
+              sendXTScancode(SC_CTRL);            // Ctrl make
+              sendXTScancode(baseCode);           // Key make
+              delay(KEY_PRESS_DURATION);
+              sendXTScancode(baseCode | 0x80);    // Key break
+              sendXTScancode(SC_CTRL | 0x80);     // Ctrl break
+            }
+          }
           // Check if this character requires shift
-          if (isShiftedChar(incomingChar)) {
+          else if (isShiftedChar(incomingChar)) {
             uint8_t baseCode = getBaseKey(incomingChar);
             if (baseCode != 0) {
               sendKeyWithShift(baseCode);
@@ -116,6 +139,40 @@ void loop() {
           escState = STATE_SS3;
           escTimeout = millis() + ESC_TIMEOUT;
           Serial.println("SS3 sequence");
+        } else if (incomingChar >= 32 && incomingChar <= 126) {
+          // Printable character after ESC = Alt+key sequence
+          Serial.print("Alt+");
+          Serial.println(incomingChar);
+
+          // Get the base scancode for this character
+          uint8_t baseCode = 0;
+          if (isShiftedChar(incomingChar)) {
+            baseCode = getBaseKey(incomingChar);
+            if (baseCode != 0) {
+              // Alt+Shift+key
+              sendXTScancode(SC_ALT);             // Alt make
+              sendXTScancode(SC_LSHIFT);          // Shift make
+              sendXTScancode(baseCode);           // Key make
+              delay(KEY_PRESS_DURATION);
+              sendXTScancode(baseCode | 0x80);    // Key break
+              sendXTScancode(SC_LSHIFT | 0x80);   // Shift break
+              sendXTScancode(SC_ALT | 0x80);      // Alt break
+            }
+          } else {
+            baseCode = charToXTScancode(incomingChar);
+            if (baseCode != 0) {
+              // Alt+key
+              sendXTScancode(SC_ALT);             // Alt make
+              sendXTScancode(baseCode);           // Key make
+              delay(KEY_PRESS_DURATION);
+              sendXTScancode(baseCode | 0x80);    // Key break
+              sendXTScancode(SC_ALT | 0x80);      // Alt break
+            }
+          }
+
+          // Reset state
+          escState = STATE_NORMAL;
+          escIndex = 0;
         } else {
           // Invalid sequence, reset
           escState = STATE_NORMAL;
@@ -383,6 +440,9 @@ uint8_t parseEscapeSequence() {
         }
       }
 
+      Serial.print("CSI num: ");
+      Serial.println(num);
+
       switch (num) {
         case 1: return 0x47;   // Home
         case 2: return 0x52;   // Insert
@@ -396,6 +456,8 @@ uint8_t parseEscapeSequence() {
         case 19: return 0x42;  // F8
         case 20: return 0x43;  // F9
         case 21: return 0x44;  // F10
+        case 23: return 0x57;  // F11 (extended, not standard XT)
+        case 24: return 0x58;  // F12 (extended, not standard XT)
       }
     }
   }
