@@ -21,6 +21,28 @@
 
 // XT Protocol Timing (microseconds)
 #define XT_CLK_HALF_PERIOD 40  // ~12.5 kHz clock (80us full period)
+#define KEY_PRESS_DURATION 50  // Key press duration in milliseconds
+#define ESC_TIMEOUT 100        // Escape sequence timeout in milliseconds
+
+// Escape sequence parser state machine
+enum EscapeState {
+  STATE_NORMAL,  // Normal character input
+  STATE_ESC,     // Received ESC, waiting for next char
+  STATE_CSI,     // Received ESC[, collecting sequence
+  STATE_SS3      // Received ESCO, collecting single-char sequence
+};
+
+// Escape sequence parser variables
+EscapeState escState = STATE_NORMAL;
+char escBuffer[8];
+uint8_t escIndex = 0;
+unsigned long escTimeout = 0;
+
+// Modifier key scancodes
+#define SC_LSHIFT  0x2A
+#define SC_RSHIFT  0x36
+#define SC_CTRL    0x1D
+#define SC_ALT     0x38
 
 void setup() {
   // Initialize GPIO pins for XT keyboard interface
@@ -44,20 +66,104 @@ void setup() {
 }
 
 void loop() {
+  // Check for escape sequence timeout
+  if (escState != STATE_NORMAL && millis() > escTimeout) {
+    // Timeout - reset state machine
+    escState = STATE_NORMAL;
+    escIndex = 0;
+    Serial.println("Escape sequence timeout");
+  }
+
   // Check for incoming serial data
   if (Serial.available() > 0) {
     char incomingChar = Serial.read();
 
-    // Echo back for debugging
-    Serial.print("Received: ");
-    Serial.println(incomingChar);
+    // Escape sequence state machine
+    switch (escState) {
+      case STATE_NORMAL:
+        if (incomingChar == 27) {  // ESC character
+          escState = STATE_ESC;
+          escIndex = 0;
+          escTimeout = millis() + ESC_TIMEOUT;
+          Serial.println("ESC received");
+        } else {
+          // Normal character - process it
+          Serial.print("Char: ");
+          Serial.println(incomingChar);
 
-    // Convert to XT scancode and send
-    uint8_t scancode = charToXTScancode(incomingChar);
-    if (scancode != 0) {
-      sendXTScancode(scancode);        // Send make code
-      delay(50);                       // Key press duration
-      sendXTScancode(scancode | 0x80); // Send break code (make + 0x80)
+          // Check if this character requires shift
+          if (isShiftedChar(incomingChar)) {
+            uint8_t baseCode = getBaseKey(incomingChar);
+            if (baseCode != 0) {
+              sendKeyWithShift(baseCode);
+            }
+          } else {
+            // Regular character without shift
+            uint8_t scancode = charToXTScancode(incomingChar);
+            if (scancode != 0) {
+              sendKey(scancode);
+            }
+          }
+        }
+        break;
+
+      case STATE_ESC:
+        if (incomingChar == '[') {
+          escState = STATE_CSI;
+          escTimeout = millis() + ESC_TIMEOUT;
+          Serial.println("CSI sequence");
+        } else if (incomingChar == 'O') {
+          escState = STATE_SS3;
+          escTimeout = millis() + ESC_TIMEOUT;
+          Serial.println("SS3 sequence");
+        } else {
+          // Invalid sequence, reset
+          escState = STATE_NORMAL;
+          escIndex = 0;
+          Serial.println("Invalid ESC sequence");
+        }
+        break;
+
+      case STATE_CSI:
+      case STATE_SS3:
+        // Collect characters into buffer
+        if (escIndex < 7) {
+          escBuffer[escIndex++] = incomingChar;
+          escTimeout = millis() + ESC_TIMEOUT;
+
+          // Check for sequence terminators
+          bool isComplete = false;
+          if (escState == STATE_CSI) {
+            // CSI sequences end with a letter or ~
+            isComplete = (incomingChar >= 'A' && incomingChar <= 'Z') ||
+                        (incomingChar >= 'a' && incomingChar <= 'z') ||
+                        (incomingChar == '~');
+          } else {  // STATE_SS3
+            // SS3 sequences are single character
+            isComplete = true;
+          }
+
+          if (isComplete) {
+            // Parse and send the sequence
+            uint8_t scancode = parseEscapeSequence();
+            if (scancode != 0) {
+              Serial.print("Sequence parsed: 0x");
+              Serial.println(scancode, HEX);
+              sendKey(scancode);
+            } else {
+              Serial.println("Unknown sequence");
+            }
+            // Reset state machine
+            escState = STATE_NORMAL;
+            escIndex = 0;
+          }
+        } else {
+          // Buffer overflow, reset
+          escState = STATE_NORMAL;
+          escIndex = 0;
+          Serial.println("Sequence buffer overflow");
+        }
+        break;
     }
   }
 }
@@ -95,44 +201,118 @@ void xtClockPulse() {
 }
 
 /*
- * Convert ASCII character to XT scancode
+ * Send a key with automatic shift modifier wrapping
+ * Used for shifted characters like !@#$%^&*()
+ */
+void sendKeyWithShift(uint8_t baseCode) {
+  sendXTScancode(SC_LSHIFT);           // Shift make
+  sendXTScancode(baseCode);            // Key make
+  delay(KEY_PRESS_DURATION);           // Key press duration
+  sendXTScancode(baseCode | 0x80);     // Key break
+  sendXTScancode(SC_LSHIFT | 0x80);    // Shift break
+}
+
+/*
+ * Send a toggle key (Caps Lock, Num Lock, Scroll Lock)
+ * Sends make then break with delay
+ */
+void sendToggleKey(uint8_t scancode) {
+  sendXTScancode(scancode);            // Make
+  delay(KEY_PRESS_DURATION);           // Key press duration
+  sendXTScancode(scancode | 0x80);     // Break
+}
+
+/*
+ * Send a regular key (make, delay, break)
+ */
+void sendKey(uint8_t scancode) {
+  sendXTScancode(scancode);            // Make
+  delay(KEY_PRESS_DURATION);           // Key press duration
+  sendXTScancode(scancode | 0x80);     // Break
+}
+
+/*
+ * Check if a character requires shift modifier
+ */
+bool isShiftedChar(char c) {
+  return (c >= 'A' && c <= 'Z') ||
+         c == '!' || c == '@' || c == '#' || c == '$' || c == '%' ||
+         c == '^' || c == '&' || c == '*' || c == '(' || c == ')' ||
+         c == '_' || c == '+' || c == '{' || c == '}' || c == '|' ||
+         c == ':' || c == '"' || c == '<' || c == '>' || c == '?' || c == '~';
+}
+
+/*
+ * Get base key scancode for a character (without shift)
+ * For shifted characters, returns the base key scancode
+ */
+uint8_t getBaseKey(char c) {
+  // Shifted number row characters -> base number keys
+  switch (c) {
+    case '!': return 0x02;  // 1
+    case '@': return 0x03;  // 2
+    case '#': return 0x04;  // 3
+    case '$': return 0x05;  // 4
+    case '%': return 0x06;  // 5
+    case '^': return 0x07;  // 6
+    case '&': return 0x08;  // 7
+    case '*': return 0x09;  // 8
+    case '(': return 0x0A;  // 9
+    case ')': return 0x0B;  // 0
+    case '_': return 0x0C;  // -
+    case '+': return 0x0D;  // =
+    case '{': return 0x1A;  // [
+    case '}': return 0x1B;  // ]
+    case '|': return 0x2B;  // backslash
+    case ':': return 0x27;  // ;
+    case '"': return 0x28;  // '
+    case '<': return 0x33;  // ,
+    case '>': return 0x34;  // .
+    case '?': return 0x35;  // /
+    case '~': return 0x29;  // `
+  }
+
+  // Uppercase letters -> lowercase scancode
+  if (c >= 'A' && c <= 'Z') {
+    c = c + 32;  // Convert to lowercase
+  }
+
+  return charToXTScancode(c);
+}
+
+/*
+ * Convert ASCII character to XT scancode (base key without modifiers)
  * Returns 0 if character is not mapped
  */
 uint8_t charToXTScancode(char c) {
-  // Convert to uppercase for simplicity
-  if (c >= 'a' && c <= 'z') {
-    c = c - 32;
-  }
-
-  // Basic ASCII to XT scancode mapping
   switch (c) {
-    // Letters (A-Z)
-    case 'A': return 0x1E;
-    case 'B': return 0x30;
-    case 'C': return 0x2E;
-    case 'D': return 0x20;
-    case 'E': return 0x12;
-    case 'F': return 0x21;
-    case 'G': return 0x22;
-    case 'H': return 0x23;
-    case 'I': return 0x17;
-    case 'J': return 0x24;
-    case 'K': return 0x25;
-    case 'L': return 0x26;
-    case 'M': return 0x32;
-    case 'N': return 0x31;
-    case 'O': return 0x18;
-    case 'P': return 0x19;
-    case 'Q': return 0x10;
-    case 'R': return 0x13;
-    case 'S': return 0x1F;
-    case 'T': return 0x14;
-    case 'U': return 0x16;
-    case 'V': return 0x2F;
-    case 'W': return 0x11;
-    case 'X': return 0x2D;
-    case 'Y': return 0x15;
-    case 'Z': return 0x2C;
+    // Lowercase letters (a-z)
+    case 'a': return 0x1E;
+    case 'b': return 0x30;
+    case 'c': return 0x2E;
+    case 'd': return 0x20;
+    case 'e': return 0x12;
+    case 'f': return 0x21;
+    case 'g': return 0x22;
+    case 'h': return 0x23;
+    case 'i': return 0x17;
+    case 'j': return 0x24;
+    case 'k': return 0x25;
+    case 'l': return 0x26;
+    case 'm': return 0x32;
+    case 'n': return 0x31;
+    case 'o': return 0x18;
+    case 'p': return 0x19;
+    case 'q': return 0x10;
+    case 'r': return 0x13;
+    case 's': return 0x1F;
+    case 't': return 0x14;
+    case 'u': return 0x16;
+    case 'v': return 0x2F;
+    case 'w': return 0x11;
+    case 'x': return 0x2D;
+    case 'y': return 0x15;
+    case 'z': return 0x2C;
 
     // Numbers (0-9)
     case '0': return 0x0B;
@@ -154,7 +334,7 @@ uint8_t charToXTScancode(char c) {
     case '\t': return 0x0F; // Tab
     case 27:   return 0x01; // Escape
 
-    // Punctuation
+    // Unshifted punctuation
     case '-': return 0x0C;  // Minus
     case '=': return 0x0D;  // Equals
     case '[': return 0x1A;  // Left bracket
@@ -169,4 +349,75 @@ uint8_t charToXTScancode(char c) {
 
     default: return 0;      // Unsupported character
   }
+}
+
+/*
+ * Parse VT100 escape sequence and return XT scancode
+ * Returns 0 if sequence is not recognized
+ */
+uint8_t parseEscapeSequence() {
+  // Null-terminate the buffer
+  escBuffer[escIndex] = '\0';
+
+  // CSI sequences (ESC[...)
+  if (escState == STATE_CSI) {
+    // Arrow keys: ESC[A, ESC[B, ESC[C, ESC[D
+    if (escIndex == 1) {
+      switch (escBuffer[0]) {
+        case 'A': return 0x48;  // Up arrow
+        case 'B': return 0x50;  // Down arrow
+        case 'C': return 0x4D;  // Right arrow
+        case 'D': return 0x4B;  // Left arrow
+        case 'H': return 0x47;  // Home (alternate)
+        case 'F': return 0x4F;  // End (alternate)
+      }
+    }
+
+    // Extended keys: ESC[n~
+    if (escIndex >= 2 && escBuffer[escIndex-1] == '~') {
+      // Extract the number
+      int num = 0;
+      for (int i = 0; i < escIndex - 1; i++) {
+        if (escBuffer[i] >= '0' && escBuffer[i] <= '9') {
+          num = num * 10 + (escBuffer[i] - '0');
+        }
+      }
+
+      switch (num) {
+        case 1: return 0x47;   // Home
+        case 2: return 0x52;   // Insert
+        case 3: return 0x53;   // Delete
+        case 4: return 0x4F;   // End
+        case 5: return 0x49;   // Page Up
+        case 6: return 0x51;   // Page Down
+        case 15: return 0x3F;  // F5
+        case 17: return 0x40;  // F6
+        case 18: return 0x41;  // F7
+        case 19: return 0x42;  // F8
+        case 20: return 0x43;  // F9
+        case 21: return 0x44;  // F10
+      }
+    }
+  }
+
+  // SS3 sequences (ESCO...)
+  if (escState == STATE_SS3) {
+    if (escIndex == 1) {
+      switch (escBuffer[0]) {
+        case 'P': return 0x3B;  // F1
+        case 'Q': return 0x3C;  // F2
+        case 'R': return 0x3D;  // F3
+        case 'S': return 0x3E;  // F4
+        // Arrow keys (some terminals send these)
+        case 'A': return 0x48;  // Up arrow
+        case 'B': return 0x50;  // Down arrow
+        case 'C': return 0x4D;  // Right arrow
+        case 'D': return 0x4B;  // Left arrow
+        case 'H': return 0x47;  // Home
+        case 'F': return 0x4F;  // End
+      }
+    }
+  }
+
+  return 0;  // Unrecognized sequence
 }
