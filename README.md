@@ -45,24 +45,14 @@ The IBM PC/XT keyboard uses a serial protocol with the following characteristics
 
 ### DFRobot Beetle to XT Keyboard Port (5-pin DIN)
 
-```
-DFRobot Beetle            XT Keyboard Port (5-pin DIN)
-                          (Looking at female connector on PC)
+![5-pin DIN connector pinout](https://sharktastica.co.uk/resources/images/pinouts/host_xt-rst_180din5.jpg)
 
-                                    ___
-                                  /  5  \
-                                 |4     3|
-  Pin 9 (XT_CLK)  -------->        \  2  /
-  Pin 10 (XT_DATA) ------->         \ 1 /
-  VCC (+)         -------->           ¯
-  GND (-)         -------->
-
-Pin 1: Clock (from Beetle Pin 9)
-Pin 2: Data  (from Beetle Pin 10)
-Pin 3: Reset (leave unconnected or tie to +5V via 10K resistor)
-Pin 4: Ground
-Pin 5: +5V (Power - can power Beetle or provide from Beetle)
-```
+**Pin Assignments:**
+- **Pin 1**: Clock (from Beetle Pin 9)
+- **Pin 2**: Data (from Beetle Pin 10)
+- **Pin 3**: Reset (leave unconnected or tie to +5V via 10K resistor)
+- **Pin 4**: Ground
+- **Pin 5**: +5V (Power - can power Beetle or provide from Beetle)
 
 ### Pin Connections
 
