@@ -4,12 +4,15 @@ A DFRobot Beetle-based XT keyboard emulator that receives keystrokes via USB Ser
 
 ## Features
 
-- Full XT keyboard protocol implementation
-- USB Serial input for easy keystroke transmission
-- ASCII to XT scancode mapping for letters, numbers, and common punctuation
-- Precise timing for XT protocol compatibility (~12.5 kHz clock)
-- Make and break code generation for proper key press/release simulation
-- Ultra-compact form factor (20mm x 22mm)
+- **Complete XT Scancode Set 1 support** (83-key PC/XT keyboard layout)
+- **VT100 escape sequence parsing** for function and navigation keys
+- **Automatic shift modifier handling** for shifted characters (!@#$%^&*() etc.)
+- **Function keys** F1-F10 support via VT100 sequences
+- **Navigation keys** (arrows, Home, End, PgUp, PgDn, Insert, Delete)
+- **Full ASCII character support** including all printable characters
+- **Precise timing** for XT protocol compatibility (~12.5 kHz clock)
+- **USB Serial input** for easy keystroke transmission
+- **Ultra-compact form factor** (20mm x 22mm DFRobot Beetle)
 
 ## Hardware Requirements
 
@@ -152,31 +155,105 @@ The PC/XT will receive these as proper keyboard scancodes.
 
 ## Supported Keys
 
-### Letters
-- A-Z (case insensitive)
+arduXT supports the complete XT Scancode Set 1 (83-key PC/XT keyboard layout).
 
-### Numbers
-- 0-9
+### Printable Characters
+
+**Letters**: A-Z, a-z (uppercase automatically sends with Shift)
+
+**Numbers**: 0-9
+
+**Shifted Characters** (automatically wrapped with Shift make/break):
+- `!` `@` `#` `$` `%` `^` `&` `*` `(` `)`
+- `_` `+` `{` `}` `|` `:` `"` `<` `>` `?` `~`
+
+**Unshifted Punctuation**:
+- `-` `=` `[` `]` `;` `'` `` ` `` `\` `,` `.` `/`
 
 ### Special Keys
-- Space
-- Enter
-- Backspace
-- Tab
-- Escape
 
-### Punctuation
-- `-` Minus/Hyphen
-- `=` Equals
-- `[` Left Bracket
-- `]` Right Bracket
-- `;` Semicolon
-- `'` Apostrophe
-- `` ` `` Grave Accent
-- `\` Backslash
-- `,` Comma
-- `.` Period
-- `/` Slash
+**Control Keys**: Space, Enter, Backspace, Tab, Escape
+
+### Function Keys (VT100 Sequences)
+
+Requires terminal configured for VT100 mode:
+
+| Key | VT100 Sequence | XT Scancode |
+|-----|----------------|-------------|
+| F1 | `ESCOP` | 0x3B |
+| F2 | `ESCOQ` | 0x3C |
+| F3 | `ESCOR` | 0x3D |
+| F4 | `ESCOS` | 0x3E |
+| F5 | `ESC[15~` | 0x3F |
+| F6 | `ESC[17~` | 0x40 |
+| F7 | `ESC[18~` | 0x41 |
+| F8 | `ESC[19~` | 0x42 |
+| F9 | `ESC[20~` | 0x43 |
+| F10 | `ESC[21~` | 0x44 |
+
+### Navigation Keys (VT100 Sequences)
+
+| Key | VT100 Sequence | XT Scancode |
+|-----|----------------|-------------|
+| Up Arrow | `ESC[A` | 0x48 |
+| Down Arrow | `ESC[B` | 0x50 |
+| Right Arrow | `ESC[C` | 0x4D |
+| Left Arrow | `ESC[D` | 0x4B |
+| Home | `ESC[H` or `ESC[1~` | 0x47 |
+| End | `ESC[F` or `ESC[4~` | 0x4F |
+| Insert | `ESC[2~` | 0x52 |
+| Delete | `ESC[3~` | 0x53 |
+| Page Up | `ESC[5~` | 0x49 |
+| Page Down | `ESC[6~` | 0x51 |
+
+**Note**: Numeric keypad keys share scancodes with navigation keys on XT keyboards. Num Lock determines behavior on the PC side.
+
+## Terminal Configuration (PuTTY)
+
+To use function keys and navigation keys with arduXT, configure your terminal to send VT100 escape sequences.
+
+### PuTTY Settings
+
+1. **Connection → Data**:
+   - Terminal-type string: `vt100`
+
+2. **Terminal → Keyboard**:
+   - The Function keys and keypad: `VT100+`
+   - The Home and End keys: `Standard`
+   - The Backspace key: `Control-H`
+   - Initial state of cursor keys: `Normal`
+   - Initial state of numeric keypad: `Normal`
+
+3. **Connection → Serial**:
+   - Speed (baud): `9600`
+   - Data bits: `8`
+   - Stop bits: `1`
+   - Parity: `None`
+   - Flow control: `None`
+
+### Testing VT100 Sequences
+
+You can verify escape sequences are being sent correctly by watching the serial monitor output. When you press a function or navigation key, you should see:
+
+```
+ESC received
+CSI sequence
+Sequence parsed: 0x48
+```
+
+Or for function keys:
+
+```
+ESC received
+SS3 sequence
+Sequence parsed: 0x3B
+```
+
+### Other Terminal Emulators
+
+- **screen**: Use `TERM=vt100 screen /dev/cu.usbmodem14101 9600`
+- **minicom**: Set terminal type to VT100 in configuration
+- **arduino-cli monitor**: Limited VT100 support, PuTTY recommended
 
 ## Customization
 
