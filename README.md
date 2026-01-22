@@ -231,6 +231,7 @@ Extend the `charToXTScancode()` function to support additional keys. Full XT sca
 - [DFRobot Beetle Wiki](https://wiki.dfrobot.com/Beetle_SKU_DFR0282)
 - [IBM PC/XT Keyboard Protocol](https://github.com/tmk/tmk_keyboard/wiki/IBM-PC-XT-Keyboard-Protocol)
 - [XT Scancode Set](https://sharktastica.co.uk/topics/keyboard-scancodes#Set1)
+- [BrokenThorn Scancode Reference](https://brokenthorn.com/Resources/OSDevScanCodes.html)
 - [Arduino Leonardo Pinout](https://docs.arduino.cc/hardware/leonardo) (Beetle is Leonardo-compatible)
 
 ## License
