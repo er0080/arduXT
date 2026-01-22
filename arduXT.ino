@@ -9,7 +9,7 @@
  *
  * XT Protocol:
  * - Clock frequency: ~10-16 kHz
- * - Data format: Start bit (0) + 8 data bits (LSB first) + Stop bit (1)
+ * - Data format: Start bit (1) + 8 data bits (LSB first)
  * - Keyboard is master (generates clock and data)
  */
 
@@ -64,11 +64,12 @@ void loop() {
 
 /*
  * Send a single byte using XT keyboard protocol
- * XT format: Start bit (0) + 8 data bits (LSB first) + Stop bit (1)
+ * XT format: Start bit (1) + 8 data bits (LSB first)
+ * Note: No stop bit in XT protocol
  */
 void sendXTScancode(uint8_t scancode) {
-  // Start bit (DATA low)
-  digitalWrite(XT_DATA_PIN, LOW);
+  // Start bit (DATA high)
+  digitalWrite(XT_DATA_PIN, HIGH);
   xtClockPulse();
 
   // Send 8 data bits (LSB first)
@@ -76,10 +77,6 @@ void sendXTScancode(uint8_t scancode) {
     digitalWrite(XT_DATA_PIN, (scancode >> i) & 0x01);
     xtClockPulse();
   }
-
-  // Stop bit (DATA high)
-  digitalWrite(XT_DATA_PIN, HIGH);
-  xtClockPulse();
 
   // Return to idle state
   digitalWrite(XT_CLK_PIN, HIGH);

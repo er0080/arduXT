@@ -31,7 +31,7 @@ A DFRobot Beetle-based XT keyboard emulator that receives keystrokes via USB Ser
 The IBM PC/XT keyboard uses a serial protocol with the following characteristics:
 
 - **Clock frequency**: 10-16 kHz (typically ~12.5 kHz)
-- **Data format**: 1 start bit (0) + 8 data bits (LSB first) + 1 stop bit (1)
+- **Data format**: 1 start bit (1) + 8 data bits (LSB first)
 - **Voltage levels**: TTL (0-5V)
 - **Master**: Keyboard generates both clock and data signals
 - **Idle state**: Both clock and data lines HIGH

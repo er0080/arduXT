@@ -75,7 +75,7 @@ arduino-cli lib list
    - Triggers scancode transmission
 
 4. **XT Protocol Layer** (`sendXTScancode()`, `xtClockPulse()`)
-   - `sendXTScancode()`: Implements XT serial protocol (start bit + 8 data bits LSB-first + stop bit)
+   - `sendXTScancode()`: Implements XT serial protocol (start bit HIGH + 8 data bits LSB-first)
    - `xtClockPulse()`: Generates precise clock pulses with configurable timing
 
 5. **Scancode Mapping** (`charToXTScancode()`)
@@ -86,7 +86,7 @@ arduino-cli lib list
 
 The XT protocol implementation follows these specifications:
 - **Clock**: Keyboard-generated, ~10-16 kHz (configurable via `XT_CLK_HALF_PERIOD`)
-- **Data Format**: 1 start bit (LOW) + 8 data bits (LSB first) + 1 stop bit (HIGH)
+- **Data Format**: 1 start bit (HIGH) + 8 data bits (LSB first)
 - **Idle State**: Both clock and data lines HIGH
 - **Make/Break Codes**: Make code for key press, make code + 0x80 for key release
 
@@ -175,8 +175,8 @@ Use a logic analyzer or oscilloscope to verify:
 - Clock frequency is within 10-16 kHz range
 - Data transitions align with clock pulses
 - Idle state: both lines HIGH
-- Start bit: data LOW during first clock pulse
-- Stop bit: data HIGH during last clock pulse
+- Start bit: data HIGH during first clock pulse
+- Data bits: LSB first, 8 bits total
 
 ## Troubleshooting Commands
 
