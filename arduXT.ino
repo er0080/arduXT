@@ -19,6 +19,10 @@
 #define XT_CLK_PIN   9   // Clock signal to PC
 #define XT_DATA_PIN  10  // Data signal to PC
 
+// Activity LED (onboard LED, pin 13 on Leonardo/Beetle)
+#define ACTIVITY_LED_PIN LED_BUILTIN  // Pin 13
+#define LED_BLINK_DURATION 30         // LED blink duration in milliseconds
+
 // XT Protocol Timing (microseconds)
 #define XT_CLK_HALF_PERIOD 40  // ~12.5 kHz clock (80us full period)
 #define KEY_PRESS_DURATION 50  // Key press duration in milliseconds
@@ -64,6 +68,10 @@ bool parseCtrlMod = false;
 bool parseAltMod = false;
 bool parseShiftMod = false;
 
+// LED activity indicator state
+unsigned long ledOffTime = 0;  // Timestamp when LED should turn back on
+bool ledIsBlinking = false;    // Track if LED is currently in blink state
+
 // Modifier key scancodes
 #define SC_LSHIFT  0x2A
 #define SC_RSHIFT  0x36
@@ -80,6 +88,10 @@ void setup() {
   digitalWrite(XT_CLK_PIN, HIGH);
   digitalWrite(XT_DATA_PIN, HIGH);
 #endif
+
+  // Initialize activity LED (on by default, blinks on serial activity)
+  pinMode(ACTIVITY_LED_PIN, OUTPUT);
+  digitalWrite(ACTIVITY_LED_PIN, HIGH);  // LED on by default
 
   // Initialize USB Serial for receiving keystrokes
   Serial.begin(9600);
@@ -100,6 +112,12 @@ void setup() {
 }
 
 void loop() {
+  // Check if LED blink period is over (non-blocking)
+  if (ledIsBlinking && millis() >= ledOffTime) {
+    digitalWrite(ACTIVITY_LED_PIN, HIGH);  // Turn LED back on
+    ledIsBlinking = false;
+  }
+
   // Check for escape sequence timeout
   if (escState != STATE_NORMAL && millis() > escTimeout) {
     // Timeout handling
@@ -119,6 +137,11 @@ void loop() {
   // Check for incoming serial data
   if (Serial.available() > 0) {
     char incomingChar = Serial.read();
+
+    // Blink LED to indicate serial activity (non-blocking)
+    digitalWrite(ACTIVITY_LED_PIN, LOW);  // Turn LED off
+    ledOffTime = millis() + LED_BLINK_DURATION;
+    ledIsBlinking = true;
 
     // Escape sequence state machine
     switch (escState) {
