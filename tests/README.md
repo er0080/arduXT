@@ -24,6 +24,44 @@ cd tests/
 uv sync
 ```
 
+## Building for Tests
+
+**IMPORTANT**: The test suite requires the Arduino sketch to be compiled with test flags enabled.
+
+### Compile and Upload for Testing
+
+```bash
+# Navigate to project root
+cd /home/eric/dev/arduXT
+
+# Compile with TEST_MODE and VERBOSE_SCANCODES enabled
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" .
+
+# Upload to device
+arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:leonardo .
+
+# Or combine both commands
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" . && \
+  arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:leonardo .
+```
+
+**Why these flags are needed:**
+- **TEST_MODE**: Disables GPIO operations, allowing tests to run faster without physical XT hardware
+- **VERBOSE_SCANCODES**: Outputs detailed scancode information (MAKE/BREAK) that the test suite validates
+
+**NEVER uncomment these defines in source code** - always pass them at compile time to prevent accidentally deploying test code to production.
+
+### Quick Build (Using Helper Script)
+
+```bash
+# From project root
+./build.sh /dev/ttyACM0 test-verbose
+```
+
+The build script handles compile-time flags automatically for different modes.
+
 ## Running Tests
 
 ### Hardware-in-the-Loop Tests

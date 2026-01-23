@@ -15,18 +15,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Compilation and Upload
 
+#### Production Build (Default)
 ```bash
-# Compile the sketch (verify syntax and generate binary)
+# Compile for production (no debug output, GPIO enabled)
 arduino-cli compile --fqbn arduino:avr:leonardo .
-
-# Find the Beetle's port (look for /dev/cu.usbmodem*)
-arduino-cli board list
 
 # Upload to DFRobot Beetle
 arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
 
 # Compile and upload in one command
-arduino-cli compile --fqbn arduino:avr:leonardo . && arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+arduino-cli compile --fqbn arduino:avr:leonardo . && \
+  arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+```
+
+#### Debug/Testing Builds
+Use compile-time flags to enable debug features **without modifying source code**:
+
+```bash
+# Verbose mode: Enable scancode debug output (MAKE/BREAK for each key)
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES" .
+
+# Test mode: Disable GPIO operations for serial testing without hardware
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DTEST_MODE" .
+
+# Both modes: Test mode + Verbose output (for hardware-in-the-loop tests)
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" .
+
+# Compile and upload with verbose mode
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES" . && \
+  arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+```
+
+**Build Modes:**
+- **Production** (default): Minimal serial output, GPIO active, ready for PC/XT connection
+- **VERBOSE_SCANCODES**: Adds detailed scancode debug output (MAKE/BREAK for every key)
+- **TEST_MODE**: Disables GPIO operations for faster serial testing without physical XT hardware
+- **TEST_MODE + VERBOSE_SCANCODES**: Used by automated test suite
+
+**IMPORTANT**: Never uncomment `#define TEST_MODE` or `#define VERBOSE_SCANCODES` in source code. Always use compile-time flags to prevent accidentally uploading test/debug code to production hardware.
+
+#### Build Helper Script
+
+For convenience, use the `build.sh` script:
+
+```bash
+# Make script executable (first time only)
+chmod +x build.sh
+
+# Production build
+./build.sh /dev/ttyACM0
+
+# Verbose mode (with scancode debug output)
+./build.sh /dev/ttyACM0 verbose
+
+# Test mode (for serial testing without hardware)
+./build.sh /dev/ttyACM0 test
+
+# Test + verbose (for automated test suite)
+./build.sh /dev/ttyACM0 test-verbose
+
+# Show help
+./build.sh --help
 ```
 
 **Note**: On Apple Silicon (ARM64), the AVR toolchain lacks native support. Use an x64 platform or Docker/VM.

@@ -24,11 +24,25 @@
 #define KEY_PRESS_DURATION 50  // Key press duration in milliseconds
 #define ESC_TIMEOUT 100        // Escape sequence timeout in milliseconds
 
-// Testing Configuration
-// Uncomment to enable test mode (disables GPIO operations for faster testing)
+// Testing and Debug Configuration
+// These should NOT be defined in source code for production builds.
+// Instead, pass them at compile time using --build-property:
+//
+// Test mode (no GPIO, faster serial testing):
+//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DTEST_MODE"
+//
+// Verbose mode (scancode debug output):
+//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES"
+//
+// Both modes:
+//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES"
+//
+// Production build (no flags):
+//   arduino-cli compile --fqbn arduino:avr:leonardo
+//
+// WARNING: Do not uncomment these in source - use compile-time flags instead!
 // #define TEST_MODE
-// Uncomment to enable verbose scancode output for debugging
-#define VERBOSE_SCANCODES
+// #define VERBOSE_SCANCODES
 
 // Escape sequence parser state machine
 enum EscapeState {
