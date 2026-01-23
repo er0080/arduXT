@@ -12,3 +12,5 @@ __pycache__/
 # Test results
 *.log
 test_results.txt
+*.json
+
