@@ -4,12 +4,18 @@ A DFRobot Beetle-based XT keyboard emulator that receives keystrokes via USB Ser
 
 ## Features
 
-- Full XT keyboard protocol implementation
-- USB Serial input for easy keystroke transmission
-- ASCII to XT scancode mapping for letters, numbers, and common punctuation
-- Precise timing for XT protocol compatibility (~12.5 kHz clock)
-- Make and break code generation for proper key press/release simulation
-- Ultra-compact form factor (20mm x 22mm)
+- **Complete XT Scancode Set 1 support** (83-key PC/XT keyboard layout)
+- **VT100 escape sequence parsing** for function and navigation keys
+- **Automatic shift modifier handling** for shifted characters (!@#$%^&*() etc.)
+- **Function keys** F1-F12 with modifier support (Alt+Fn, Ctrl+Fn, Ctrl+Alt+Fn)
+- **Navigation keys** (arrows, Home, End, PgUp, PgDn, Insert, Delete)
+- **Control sequences** Ctrl+A through Ctrl+Z
+- **Alt combinations** Alt+letter, Alt+number, Alt+Shift+key
+- **Full ASCII character support** including all printable characters
+- **Precise timing** for XT protocol compatibility (~12.5 kHz clock)
+- **USB Serial input** for easy keystroke transmission
+- **Hardware-in-the-loop test suite** with 97 comprehensive tests
+- **Ultra-compact form factor** (20mm x 22mm DFRobot Beetle)
 
 ## Hardware Requirements
 
@@ -104,12 +110,54 @@ Look for a port like `/dev/cu.usbmodem*` with board type "Arduino Leonardo" (Bee
 
 ### 4. Compile and Upload
 
+#### Using the Build Helper Script (Recommended)
+
+The easiest way to build and upload is using the `build.sh` helper script:
+
+```bash
+# Make script executable (first time only)
+chmod +x build.sh
+
+# Production build (default - no debug output, GPIO enabled)
+./build.sh /dev/cu.usbmodem14101
+
+# View all build options
+./build.sh --help
+```
+
+#### Manual Compilation
+
+For manual control or custom configurations:
+
 ```bash
 # Compile the sketch (from project root)
 arduino-cli compile --fqbn arduino:avr:leonardo .
 
 # Upload to Leonardo (replace PORT with your actual port)
 arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+
+# Or combine both commands
+arduino-cli compile --fqbn arduino:avr:leonardo . && \
+  arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
+```
+
+**Build Modes**: For debugging or testing, you can enable additional output with compile-time flags:
+
+```bash
+# Verbose mode (adds scancode debug output)
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES" .
+
+# Test mode (disables GPIO for serial testing without hardware)
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE" .
+```
+
+Or use the build script:
+```bash
+./build.sh /dev/cu.usbmodem14101 verbose      # Verbose mode
+./build.sh /dev/cu.usbmodem14101 test         # Test mode
+./build.sh /dev/cu.usbmodem14101 test-verbose # Both modes
 ```
 
 **Note for Apple Silicon users**: The Arduino AVR toolchain doesn't have native ARM64 support. Compile on an x64 platform or use Docker/VM.
@@ -152,31 +200,180 @@ The PC/XT will receive these as proper keyboard scancodes.
 
 ## Supported Keys
 
-### Letters
-- A-Z (case insensitive)
+arduXT supports the complete XT Scancode Set 1 (83-key PC/XT keyboard layout).
 
-### Numbers
-- 0-9
+### Printable Characters
+
+**Letters**: A-Z, a-z (uppercase automatically sends with Shift)
+
+**Numbers**: 0-9
+
+**Shifted Characters** (automatically wrapped with Shift make/break):
+- `!` `@` `#` `$` `%` `^` `&` `*` `(` `)`
+- `_` `+` `{` `}` `|` `:` `"` `<` `>` `?` `~`
+
+**Unshifted Punctuation**:
+- `-` `=` `[` `]` `;` `'` `` ` `` `\` `,` `.` `/`
 
 ### Special Keys
-- Space
-- Enter
-- Backspace
-- Tab
-- Escape
 
-### Punctuation
-- `-` Minus/Hyphen
-- `=` Equals
-- `[` Left Bracket
-- `]` Right Bracket
-- `;` Semicolon
-- `'` Apostrophe
-- `` ` `` Grave Accent
-- `\` Backslash
-- `,` Comma
-- `.` Period
-- `/` Slash
+**Control Keys**: Space, Enter, Backspace, Tab, Escape
+
+### Function Keys (VT100 Sequences)
+
+Requires terminal configured for VT100 mode:
+
+| Key | VT100 Sequence | XT Scancode |
+|-----|----------------|-------------|
+| F1 | `ESCOP` | 0x3B |
+| F2 | `ESCOQ` | 0x3C |
+| F3 | `ESCOR` | 0x3D |
+| F4 | `ESCOS` | 0x3E |
+| F5 | `ESC[15~` | 0x3F |
+| F6 | `ESC[17~` | 0x40 |
+| F7 | `ESC[18~` | 0x41 |
+| F8 | `ESC[19~` | 0x42 |
+| F9 | `ESC[20~` | 0x43 |
+| F10 | `ESC[21~` | 0x44 |
+| F11 | `ESC[23~` | 0x57 |
+| F12 | `ESC[24~` | 0x58 |
+
+**Modifier Support**: Function keys support modifiers via CSI parameters:
+- `Alt+Fn`: `ESC[15;3~` (modifier = 3)
+- `Ctrl+Fn`: `ESC[15;5~` (modifier = 5)
+- `Ctrl+Alt+Fn`: `ESC[15;7~` (modifier = 7)
+- `Shift+Fn`: `ESC[15;2~` (modifier = 2)
+
+F1-F4 also support double-ESC sequences for Alt modifier:
+- `Alt+F1`: `ESC ESC O P` or `ESC[1;3P`
+
+### Navigation Keys (VT100 Sequences)
+
+| Key | VT100 Sequence | XT Scancode |
+|-----|----------------|-------------|
+| Up Arrow | `ESC[A` | 0x48 |
+| Down Arrow | `ESC[B` | 0x50 |
+| Right Arrow | `ESC[C` | 0x4D |
+| Left Arrow | `ESC[D` | 0x4B |
+| Home | `ESC[H` or `ESC[1~` | 0x47 |
+| End | `ESC[F` or `ESC[4~` | 0x4F |
+| Insert | `ESC[2~` | 0x52 |
+| Delete | `ESC[3~` | 0x53 |
+| Page Up | `ESC[5~` | 0x49 |
+| Page Down | `ESC[6~` | 0x51 |
+
+**Note**: Numeric keypad keys share scancodes with navigation keys on XT keyboards. Num Lock determines behavior on the PC side.
+
+### Control Sequences
+
+Control sequences are sent as ASCII control characters (0x01-0x1A):
+
+| Sequence | ASCII Code | XT Scancode (Ctrl + key) |
+|----------|------------|--------------------------|
+| Ctrl+A | 0x01 | Ctrl (0x1D) + A (0x1E) |
+| Ctrl+B | 0x02 | Ctrl (0x1D) + B (0x30) |
+| ... | ... | ... |
+| Ctrl+Z | 0x1A | Ctrl (0x1D) + Z (0x2C) |
+
+**Ctrl+Alt Combinations**: Sent as `ESC` followed by the control character:
+- `Ctrl+Alt+A`: `ESC 0x01`
+
+### Alt Key Combinations
+
+Alt combinations are sent using double-ESC sequences:
+
+**Alt+Letter**: `ESC ESC <char>` or `ESC <char>`
+- Example: `Alt+A` = `ESC ESC a` or `ESC a`
+
+**Alt+Number**: `ESC ESC <digit>`
+- Example: `Alt+1` = `ESC ESC 1`
+
+**Alt+Shift+Key**: Modifier parameter in escape sequences
+- Example: `Alt+Shift+F5` = `ESC[15;2;3~`
+
+## Terminal Configuration (PuTTY)
+
+To use function keys and navigation keys with arduXT, configure your terminal to send VT100 escape sequences.
+
+### PuTTY Settings
+
+1. **Connection → Data**:
+   - Terminal-type string: `vt100`
+
+2. **Terminal → Keyboard**:
+   - The Function keys and keypad: `VT100+`
+   - The Home and End keys: `Standard`
+   - The Backspace key: `Control-H`
+   - Initial state of cursor keys: `Normal`
+   - Initial state of numeric keypad: `Normal`
+
+3. **Connection → Serial**:
+   - Speed (baud): `9600`
+   - Data bits: `8`
+   - Stop bits: `1`
+   - Parity: `None`
+   - Flow control: `None`
+
+### Testing VT100 Sequences
+
+You can verify escape sequences are being sent correctly by watching the serial monitor output. When you press a function or navigation key, you should see:
+
+```
+ESC received
+CSI sequence
+Sequence parsed: 0x48
+```
+
+Or for function keys:
+
+```
+ESC received
+SS3 sequence
+Sequence parsed: 0x3B
+```
+
+### Other Terminal Emulators
+
+- **screen**: Use `TERM=vt100 screen /dev/cu.usbmodem14101 9600`
+- **minicom**: Set terminal type to VT100 in configuration
+- **arduino-cli monitor**: Limited VT100 support, PuTTY recommended
+
+## Testing
+
+arduXT includes a comprehensive hardware-in-the-loop test suite with 97 tests covering:
+- Basic characters (lowercase, uppercase, digits, spaces)
+- Punctuation (shifted and unshifted)
+- Control sequences (Ctrl+A through Ctrl+Z)
+- Function keys (F1-F12)
+- Function key modifiers (Alt+Fn, Ctrl+Fn, Ctrl+Alt+Fn)
+- Navigation keys (arrows, Home, End, etc.)
+- Alt combinations (Alt+letter, Alt+number, Alt+Shift+key)
+- Special cases (standalone ESC, escape sequence timeouts)
+
+### Running Tests
+
+```bash
+# Navigate to tests directory
+cd tests/
+
+# Install dependencies (using uv package manager)
+uv sync
+
+# Build Arduino sketch with test flags
+cd ..
+./build.sh /dev/cu.usbmodem14101 test-verbose
+
+# Run test suite
+cd tests/
+uv run test_arduxt.py /dev/cu.usbmodem14101
+```
+
+For detailed test documentation, see [tests/README.md](tests/README.md).
+
+**Test Requirements**:
+- `uv` package manager (install: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Arduino sketch compiled with `ARDUXT_TEST_MODE` and `VERBOSE_SCANCODES` flags
+- DFRobot Beetle connected via USB
 
 ## Customization
 
@@ -241,7 +438,7 @@ MIT License - Feel free to modify and distribute.
 ## Contributing
 
 Contributions welcome! Areas for improvement:
-- Extended scancode support (function keys, numpad)
 - Bidirectional communication (PC commands to keyboard)
-- Configurable pin assignments
+- Configurable pin assignments via runtime commands
 - EEPROM configuration storage
+- Adjustable timing parameters via serial commands
