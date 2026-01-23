@@ -1,0 +1,11 @@
+[project]
+name = "arduxt-tests"
+version = "0.1.0"
+description = "Hardware-in-the-loop test suite for arduXT keyboard emulator"
+requires-python = ">=3.8"
+dependencies = [
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+test-arduxt = "test_arduxt:main"

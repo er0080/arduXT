@@ -24,6 +24,12 @@
 #define KEY_PRESS_DURATION 50  // Key press duration in milliseconds
 #define ESC_TIMEOUT 100        // Escape sequence timeout in milliseconds
 
+// Testing Configuration
+// Uncomment to enable test mode (disables GPIO operations for faster testing)
+// #define TEST_MODE
+// Uncomment to enable verbose scancode output for debugging
+#define VERBOSE_SCANCODES
+
 // Escape sequence parser state machine
 enum EscapeState {
   STATE_NORMAL,  // Normal character input
@@ -45,6 +51,7 @@ unsigned long escTimeout = 0;
 #define SC_ALT     0x38
 
 void setup() {
+#ifndef TEST_MODE
   // Initialize GPIO pins for XT keyboard interface
   pinMode(XT_CLK_PIN, OUTPUT);
   pinMode(XT_DATA_PIN, OUTPUT);
@@ -52,6 +59,7 @@ void setup() {
   // XT keyboard idle state: both lines HIGH
   digitalWrite(XT_CLK_PIN, HIGH);
   digitalWrite(XT_DATA_PIN, HIGH);
+#endif
 
   // Initialize USB Serial for receiving keystrokes
   Serial.begin(9600);
@@ -62,6 +70,12 @@ void setup() {
   }
 
   Serial.println("arduXT - XT Keyboard Emulator");
+#ifdef TEST_MODE
+  Serial.println("TEST MODE: GPIO operations disabled");
+#endif
+#ifdef VERBOSE_SCANCODES
+  Serial.println("VERBOSE MODE: Scancode output enabled");
+#endif
   Serial.println("Ready to receive keystrokes...");
 }
 
@@ -71,10 +85,10 @@ void loop() {
     // Timeout handling
     if (escState == STATE_ESC && escIndex == 0) {
       // Standalone ESC key pressed
-      Serial.println("Standalone ESC key");
+      Serial.println("KEY: ESC (standalone)");
       sendKey(0x01);  // ESC scancode
     } else {
-      Serial.println("Escape sequence timeout");
+      Serial.println("ERROR: Escape sequence timeout");
     }
     // Reset state machine
     escState = STATE_NORMAL;
@@ -95,8 +109,14 @@ void loop() {
           Serial.println("ESC received");
         } else {
           // Normal character - process it
-          Serial.print("Char: 0x");
-          Serial.println((uint8_t)incomingChar, HEX);
+          Serial.print("INPUT: 0x");
+          Serial.print((uint8_t)incomingChar, HEX);
+          if (incomingChar >= 32 && incomingChar <= 126) {
+            Serial.print(" (");
+            Serial.print(incomingChar);
+            Serial.print(")");
+          }
+          Serial.println();
 
           // Check for Ctrl sequences (Ctrl+A through Ctrl+Z = 0x01-0x1A)
           if (incomingChar >= 0x01 && incomingChar <= 0x1A) {
@@ -104,7 +124,7 @@ void loop() {
             char letter = incomingChar + 'a' - 1;  // Convert to lowercase letter
             uint8_t baseCode = charToXTScancode(letter);
             if (baseCode != 0) {
-              Serial.print("Ctrl+");
+              Serial.print("KEY: Ctrl+");
               Serial.println(letter);
               // Send Ctrl+key sequence
               sendXTScancode(SC_CTRL);            // Ctrl make
@@ -116,6 +136,9 @@ void loop() {
           }
           // Check if this character requires shift
           else if (isShiftedChar(incomingChar)) {
+            Serial.print("KEY: ");
+            Serial.print(incomingChar);
+            Serial.println(" (shifted)");
             uint8_t baseCode = getBaseKey(incomingChar);
             if (baseCode != 0) {
               sendKeyWithShift(baseCode);
@@ -124,6 +147,13 @@ void loop() {
             // Regular character without shift
             uint8_t scancode = charToXTScancode(incomingChar);
             if (scancode != 0) {
+              Serial.print("KEY: ");
+              if (incomingChar >= 32 && incomingChar <= 126) {
+                Serial.println(incomingChar);
+              } else {
+                Serial.print("0x");
+                Serial.println((uint8_t)incomingChar, HEX);
+              }
               sendKey(scancode);
             }
           }
@@ -141,7 +171,7 @@ void loop() {
           Serial.println("SS3 sequence");
         } else if (incomingChar >= 32 && incomingChar <= 126) {
           // Printable character after ESC = Alt+key sequence
-          Serial.print("Alt+");
+          Serial.print("KEY: Alt+");
           Serial.println(incomingChar);
 
           // Get the base scancode for this character
@@ -177,7 +207,7 @@ void loop() {
           // Invalid sequence, reset
           escState = STATE_NORMAL;
           escIndex = 0;
-          Serial.println("Invalid ESC sequence");
+          Serial.println("ERROR: Invalid ESC sequence");
         }
         break;
 
@@ -204,11 +234,11 @@ void loop() {
             // Parse and send the sequence
             uint8_t scancode = parseEscapeSequence();
             if (scancode != 0) {
-              Serial.print("Sequence parsed: 0x");
+              Serial.print("KEY: Escape sequence -> 0x");
               Serial.println(scancode, HEX);
               sendKey(scancode);
             } else {
-              Serial.println("Unknown sequence");
+              Serial.println("ERROR: Unknown escape sequence");
             }
             // Reset state machine
             escState = STATE_NORMAL;
@@ -218,7 +248,7 @@ void loop() {
           // Buffer overflow, reset
           escState = STATE_NORMAL;
           escIndex = 0;
-          Serial.println("Sequence buffer overflow");
+          Serial.println("ERROR: Sequence buffer overflow");
         }
         break;
     }
@@ -231,6 +261,15 @@ void loop() {
  * Note: No stop bit in XT protocol
  */
 void sendXTScancode(uint8_t scancode) {
+#ifdef VERBOSE_SCANCODES
+  Serial.print("SCANCODE: 0x");
+  Serial.print(scancode, HEX);
+  Serial.print(" (");
+  Serial.print((scancode & 0x80) ? "BREAK" : "MAKE");
+  Serial.println(")");
+#endif
+
+#ifndef TEST_MODE
   // Start bit (DATA high)
   digitalWrite(XT_DATA_PIN, HIGH);
   xtClockPulse();
@@ -244,6 +283,7 @@ void sendXTScancode(uint8_t scancode) {
   // Return to idle state
   digitalWrite(XT_CLK_PIN, HIGH);
   digitalWrite(XT_DATA_PIN, HIGH);
+#endif
 }
 
 /*
@@ -251,10 +291,12 @@ void sendXTScancode(uint8_t scancode) {
  * Clock idles HIGH, pulses LOW
  */
 void xtClockPulse() {
+#ifndef TEST_MODE
   delayMicroseconds(XT_CLK_HALF_PERIOD);
   digitalWrite(XT_CLK_PIN, LOW);
   delayMicroseconds(XT_CLK_HALF_PERIOD);
   digitalWrite(XT_CLK_PIN, HIGH);
+#endif
 }
 
 /*
