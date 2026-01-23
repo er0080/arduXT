@@ -200,20 +200,31 @@ python test_arduxt.py /dev/ttyACM0
 
 ## Fuzz Testing
 
-The fuzz testing framework provides long-duration stress testing with randomized inputs to identify edge cases, timing issues, and failure modes.
+The fuzz testing framework provides long-duration stress testing with comprehensive modifier-based coverage to systematically identify edge cases, timing issues, and failure modes.
 
 ### Overview
 
-Fuzz testing sends randomized keystrokes across all supported functionality:
-- ASCII characters (40%)
-- Control sequences (15%)
-- Function keys (15%)
-- Function keys with modifiers (10%)
-- Navigation keys (10%)
-- Alt combinations (5%)
-- Malformed escape sequences (5%)
+The fuzzer uses a **modifier-based category system** that tests all possible combinations of modifier keys with different key types. This systematic approach ensures complete coverage of the keyboard emulator's functionality.
 
-The fuzzer runs for a specified duration (hours) or input count and generates detailed reports for analysis.
+**Modifier Combinations (8 total):**
+- `none` - No modifiers
+- `shift` - Shift only
+- `ctrl` - Ctrl only
+- `alt` - Alt only
+- `shift_ctrl` - Shift+Ctrl
+- `shift_alt` - Shift+Alt
+- `ctrl_alt` - Ctrl+Alt
+- `shift_ctrl_alt` - All three modifiers
+
+**Key Types (6 categories):**
+- `letters` - a-z (26 keys)
+- `digits` - 0-9 (10 keys)
+- `punctuation` - Space, -, =, [, ], ;, ', `, \, ,, ., / (12 keys)
+- `function` - F1-F12 (12 keys)
+- `navigation` - Arrows, Home, End, Insert, Delete, PgUp, PgDn (10 keys)
+- `special` - Enter, Tab, Backspace, Escape (4 keys)
+
+This creates **48 distinct test categories** (8 modifiers × 6 key types). Each test randomly selects a key and modifier combination, generating the appropriate VT100 escape sequence or control code.
 
 ### Running Fuzz Tests
 
@@ -222,18 +233,18 @@ The fuzzer runs for a specified duration (hours) or input count and generates de
 cd ..
 ./build.sh /dev/ttyACM0 test-verbose
 
-# Run fuzz test for 1 hour
+# Quick test (5 minutes) with both reports
 cd tests/
-uv run fuzz_arduxt.py /dev/ttyACM0 --duration 3600
+uv run fuzz_arduxt.py /dev/ttyACM0 --duration 300 --report stats.json --failures failures.json
 
-# Run fuzz test for 4 hours with JSON report
-uv run fuzz_arduxt.py /dev/ttyACM0 --duration 14400 --report fuzz_report.json
+# Standard test (1 hour) with reports
+uv run fuzz_arduxt.py /dev/ttyACM0 --duration 3600 --report stats.json --failures failures.json
 
-# Send 100,000 random inputs
-uv run fuzz_arduxt.py /dev/ttyACM0 --count 100000
+# Overnight test (8 hours) with reports
+uv run fuzz_arduxt.py /dev/ttyACM0 --duration 28800 --report overnight_stats.json --failures overnight_failures.json
 
-# Overnight test (8 hours)
-uv run fuzz_arduxt.py /dev/ttyACM0 --duration 28800 --report overnight_fuzz.json
+# Count-based test (10,000 inputs)
+uv run fuzz_arduxt.py /dev/ttyACM0 --count 10000 --report stats.json --failures failures.json
 ```
 
 ### Fuzz Test Options
@@ -243,33 +254,84 @@ uv run fuzz_arduxt.py /dev/ttyACM0 --duration 28800 --report overnight_fuzz.json
 uv run fuzz_arduxt.py --help
 
 # Common options
---duration SECONDS    # Test duration in seconds
---count NUMBER        # Number of inputs to send
---baudrate RATE       # Baud rate (default: 9600)
---timeout SECONDS     # Response timeout (default: 1.0)
---report FILENAME     # Save JSON report to file
+--duration SECONDS      # Test duration in seconds
+--count NUMBER          # Number of inputs to send
+--baudrate RATE         # Baud rate (default: 9600)
+--timeout SECONDS       # Response timeout (default: 1.0)
+--delay SECONDS         # Inter-keystroke delay (default: 0.075)
+--report FILENAME       # Save statistics report to JSON file
+--failures FILENAME     # Save detailed failure log to JSON file
 ```
+
+**Important**: Use both `--report` and `--failures` for complete analysis. The statistics report contains per-category metrics, while the failure log contains detailed information about every failure.
 
 ### Understanding Fuzz Reports
 
-The fuzzer provides real-time progress:
+**Real-Time Progress Display:**
 ```
-Elapsed: 0:15:23 | Inputs: 15432 | Success: 99.8% | Throughput: 16.7/s | Avg Response: 45.2ms | Failures: 31
+Elapsed: 0:05:23 | Inputs: 4230 | Success: 98.3% | Throughput: 13.1/s | Avg Response: 52.4ms | Failures: 72
 ```
 
-At completion, a detailed summary is displayed:
-- **Total Inputs**: Number of random inputs sent
-- **Success Rate**: Percentage of successful operations
-- **Throughput**: Inputs processed per second
-- **Response Times**: Min/Max/Average response times
-- **Category Breakdown**: Distribution across input types
-- **Recent Failures**: Last 10 failures with details
+**Summary Output (sorted by failure rate):**
+```
+Category Breakdown (sorted by failure rate):
+  ctrl_alt_function        :   142 total,   28 failures ( 80.3% success)
+  shift_ctrl_alt_letters   :    89 total,   12 failures ( 86.5% success)
+  shift_ctrl_navigation    :   105 total,    8 failures ( 92.4% success)
+  alt_function             :   156 total,    5 failures ( 96.8% success)
 
-JSON reports contain:
-- Complete statistics
-- Performance metrics
-- Error breakdown (timeouts, unexpected responses)
-- Last 100 failures with timestamps and context
+Categories with 100% success:
+  letters                  :   423 total
+  shift_letters            :   387 total
+  digits                   :   198 total
+```
+
+The summary shows:
+- **Per-category success rates**: Identify problematic modifier combinations
+- **Sorted by failures**: Categories with most failures appear first
+- **100% success categories**: Shows robust implementations
+- **Performance metrics**: Throughput and response times
+- **Recent failures**: Last 10 failures with human-readable descriptions
+
+**Statistics Report JSON** (`--report stats.json`):
+```json
+{
+  "summary": {
+    "duration_seconds": 323,
+    "total_inputs": 4230,
+    "success_rate": 98.3,
+    "throughput_per_second": 13.1
+  },
+  "category_statistics": {
+    "ctrl_alt_function": {
+      "total": 142,
+      "successes": 114,
+      "failures": 28,
+      "success_rate": 80.3
+    }
+  }
+}
+```
+
+**Failure Log JSON** (`--failures failures.json`):
+```json
+{
+  "metadata": {
+    "total_failures": 72,
+    "total_tests": 4230
+  },
+  "failures": [
+    {
+      "timestamp": "2026-01-23T17:12:15",
+      "category": "ctrl_alt_function",
+      "key_description": "Ctrl+Alt+F5",
+      "input_hex": "1b5b31353b377e",
+      "input_bytes": [27, 91, 49, 53, 59, 55, 126],
+      "error_type": "timeout"
+    }
+  ]
+}
+```
 
 ### Interpreting Results
 
@@ -293,9 +355,15 @@ JSON reports contain:
 - Need to investigate memory usage patterns
 
 **Category-Specific Failures**:
-- If failures cluster in one category (e.g., "function_mod")
-- Indicates specific code path issues
-- Focus debugging on that functionality
+- If failures cluster in specific modifier combinations (e.g., "ctrl_alt_function")
+- Indicates issues with that modifier/key type combination
+- Focus debugging on VT100 escape sequence generation for those modifiers
+- Check CSI parameter encoding (modifier values: Shift=1, Alt=2, Ctrl=4)
+
+**Example Analysis**:
+- **High failures in `ctrl_alt_*` categories**: Check Ctrl+Alt escape sequence generation
+- **High failures in `*_function` categories**: Check function key CSI format with modifiers
+- **High failures in `shift_ctrl_*` categories**: Check multi-modifier combinations
 
 ### Recommended Test Durations
 
@@ -319,29 +387,52 @@ JSON reports contain:
 
 ### Analyzing Failures
 
-Review the JSON report for failure patterns:
+Review both JSON files for comprehensive failure analysis:
 
 ```python
 import json
+from collections import Counter, defaultdict
 
-# Load report
-with open('fuzz_report.json') as f:
-    report = json.load(f)
+# Load statistics report
+with open('stats.json') as f:
+    stats = json.load(f)
 
-# Check failure categories
-for failure in report['failures']:
-    print(f"{failure['category']}: {failure['input']} -> {failure['error_type']}")
+# Find categories with lowest success rates
+categories = stats['category_statistics']
+sorted_cats = sorted(categories.items(),
+                     key=lambda x: x[1]['success_rate'])
 
-# Look for patterns
-from collections import Counter
-error_types = Counter(f['error_type'] for f in report['failures'])
-print(f"Error distribution: {error_types}")
+print("Categories with lowest success rates:")
+for cat, data in sorted_cats[:5]:
+    print(f"  {cat}: {data['success_rate']:.1f}% "
+          f"({data['failures']}/{data['total']} failures)")
+
+# Load failure log
+with open('failures.json') as f:
+    failures = json.load(f)
+
+# Analyze error types by category
+error_by_category = defaultdict(lambda: defaultdict(int))
+for failure in failures['failures']:
+    error_by_category[failure['category']][failure['error_type']] += 1
+
+print("\nError types by category:")
+for category, errors in error_by_category.items():
+    print(f"  {category}: {dict(errors)}")
+
+# Find specific failing keys
+print("\nMost common failing key descriptions:")
+key_failures = Counter(f['key_description'] for f in failures['failures'])
+for key, count in key_failures.most_common(10):
+    print(f"  {key}: {count} failures")
 ```
 
 Common failure patterns:
-- **Timeout on malformed sequences**: Expected behavior
-- **Unexpected errors on valid inputs**: Requires investigation
-- **Failures after long runs**: Potential memory issues
+- **Timeout errors**: Arduino not responding, possible buffer overflow or parser hang
+- **Unexpected errors**: Arduino returns ERROR message for valid input
+- **Modifier-specific patterns**: Certain modifier combinations consistently fail
+- **Key-type specific**: Certain key types (e.g., function, navigation) fail more
+- **Failures after long runs**: Potential memory leaks or buffer management issues
 
 ## Troubleshooting
 
