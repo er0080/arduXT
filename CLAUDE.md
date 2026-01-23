@@ -239,7 +239,7 @@ Use a logic analyzer or oscilloscope to verify:
 arduino-cli board list
 
 # Quick serial port check (safe, won't hang)
-./check_serial.sh /dev/ttyACM0
+./scripts/check_serial.sh /dev/ttyACM0
 
 # Verify core is installed
 arduino-cli core list
@@ -255,7 +255,7 @@ arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo . --verb
 - Beetle not detected: Try pressing reset button, then run upload within 8 seconds
 - Port disappears: Beetle enters bootloader briefly on connection
 - Upload fails: Verify power is 4.5-5V (not 6V or higher)
-- Serial reads hang: Use `check_serial.sh` utility instead of raw serial commands
+- Serial reads hang: Use `scripts/check_serial.sh` utility instead of raw serial commands
 
 ## Project Structure
 
@@ -264,9 +264,10 @@ arduXT/
 ├── .gitignore          # Git ignore patterns
 ├── arduXT.ino          # Main sketch (all code in one file)
 ├── build.sh            # Build helper script for different modes
-├── check_serial.sh     # Serial port testing utility
 ├── CLAUDE.md           # This file (developer/Claude guidance)
 ├── README.md           # User documentation, wiring diagrams
+├── scripts/            # Utility scripts
+│   └── check_serial.sh # Serial port testing utility
 └── tests/              # Hardware-in-the-loop test suite
     ├── test_arduxt.py  # Python test harness (97 tests)
     ├── pyproject.toml  # uv package configuration
