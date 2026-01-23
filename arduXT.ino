@@ -43,6 +43,12 @@ EscapeState escState = STATE_NORMAL;
 char escBuffer[8];
 uint8_t escIndex = 0;
 unsigned long escTimeout = 0;
+bool escAltModifier = false;  // Track Alt from double-ESC (ESC ESC O X)
+
+// Modifier flags from parsed escape sequences
+bool parseCtrlMod = false;
+bool parseAltMod = false;
+bool parseShiftMod = false;
 
 // Modifier key scancodes
 #define SC_LSHIFT  0x2A
@@ -93,6 +99,7 @@ void loop() {
     // Reset state machine
     escState = STATE_NORMAL;
     escIndex = 0;
+    escAltModifier = false;
   }
 
   // Check for incoming serial data
@@ -169,6 +176,32 @@ void loop() {
           escState = STATE_SS3;
           escTimeout = millis() + ESC_TIMEOUT;
           Serial.println("SS3 sequence");
+        } else if (incomingChar == 27) {
+          // Double ESC - this is Alt+Fn sequence (ESC ESC O P/Q/R/S)
+          // Mark that we're in Alt mode and continue parsing
+          escAltModifier = true;
+          Serial.println("Double ESC (Alt modifier)");
+          // Stay in STATE_ESC to process the next character
+        } else if (incomingChar >= 0x01 && incomingChar <= 0x1A) {
+          // Ctrl code after ESC = Ctrl+Alt+key sequence
+          char letter = incomingChar + 'a' - 1;  // Convert to lowercase letter
+          uint8_t baseCode = charToXTScancode(letter);
+          if (baseCode != 0) {
+            Serial.print("KEY: Ctrl+Alt+");
+            Serial.println(letter);
+            // Send Ctrl+Alt+key sequence
+            sendXTScancode(SC_CTRL);            // Ctrl make
+            sendXTScancode(SC_ALT);             // Alt make
+            sendXTScancode(baseCode);           // Key make
+            delay(KEY_PRESS_DURATION);
+            sendXTScancode(baseCode | 0x80);    // Key break
+            sendXTScancode(SC_ALT | 0x80);      // Alt break
+            sendXTScancode(SC_CTRL | 0x80);     // Ctrl break
+          }
+          // Reset state
+          escState = STATE_NORMAL;
+          escIndex = 0;
+          escAltModifier = false;
         } else if (incomingChar >= 32 && incomingChar <= 126) {
           // Printable character after ESC = Alt+key sequence
           Serial.print("KEY: Alt+");
@@ -203,10 +236,12 @@ void loop() {
           // Reset state
           escState = STATE_NORMAL;
           escIndex = 0;
+          escAltModifier = false;
         } else {
           // Invalid sequence, reset
           escState = STATE_NORMAL;
           escIndex = 0;
+          escAltModifier = false;
           Serial.println("ERROR: Invalid ESC sequence");
         }
         break;
@@ -235,19 +270,64 @@ void loop() {
             uint8_t scancode = parseEscapeSequence();
             if (scancode != 0) {
               Serial.print("KEY: Escape sequence -> 0x");
-              Serial.println(scancode, HEX);
-              sendKey(scancode);
+              Serial.print(scancode, HEX);
+
+              // Check for Alt from double-ESC
+              bool hasAlt = parseAltMod || escAltModifier;
+              bool hasCtrl = parseCtrlMod;
+              bool hasShift = parseShiftMod;
+
+              // Print modifier info
+              if (hasCtrl || hasAlt || hasShift) {
+                Serial.print(" (");
+                if (hasCtrl) Serial.print("Ctrl+");
+                if (hasAlt) Serial.print("Alt+");
+                if (hasShift) Serial.print("Shift+");
+                Serial.print(")");
+              }
+              Serial.println();
+
+              // Send with modifiers
+              if (hasCtrl && hasAlt) {
+                // Ctrl+Alt+Key
+                sendXTScancode(SC_CTRL);
+                sendXTScancode(SC_ALT);
+                sendXTScancode(scancode);
+                delay(KEY_PRESS_DURATION);
+                sendXTScancode(scancode | 0x80);
+                sendXTScancode(SC_ALT | 0x80);
+                sendXTScancode(SC_CTRL | 0x80);
+              } else if (hasCtrl) {
+                // Ctrl+Key
+                sendXTScancode(SC_CTRL);
+                sendXTScancode(scancode);
+                delay(KEY_PRESS_DURATION);
+                sendXTScancode(scancode | 0x80);
+                sendXTScancode(SC_CTRL | 0x80);
+              } else if (hasAlt) {
+                // Alt+Key
+                sendXTScancode(SC_ALT);
+                sendXTScancode(scancode);
+                delay(KEY_PRESS_DURATION);
+                sendXTScancode(scancode | 0x80);
+                sendXTScancode(SC_ALT | 0x80);
+              } else {
+                // No modifiers
+                sendKey(scancode);
+              }
             } else {
               Serial.println("ERROR: Unknown escape sequence");
             }
             // Reset state machine
             escState = STATE_NORMAL;
             escIndex = 0;
+            escAltModifier = false;  // Reset Alt flag
           }
         } else {
           // Buffer overflow, reset
           escState = STATE_NORMAL;
           escIndex = 0;
+          escAltModifier = false;
           Serial.println("ERROR: Sequence buffer overflow");
         }
         break;
@@ -451,17 +531,56 @@ uint8_t charToXTScancode(char c) {
 }
 
 /*
- * Parse VT100 escape sequence and return XT scancode
- * Returns 0 if sequence is not recognized
+ * Parse VT100 escape sequence and return XT scancode with modifiers
+ * Returns scancode, or 0 if not recognized
+ * Sets global variables for modifier state (Ctrl, Alt, Shift)
  */
 uint8_t parseEscapeSequence() {
+  // Reset modifier flags
+  parseCtrlMod = false;
+  parseAltMod = false;
+  parseShiftMod = false;
+
   // Null-terminate the buffer
   escBuffer[escIndex] = '\0';
 
   // CSI sequences (ESC[...)
   if (escState == STATE_CSI) {
-    // Arrow keys: ESC[A, ESC[B, ESC[C, ESC[D
-    if (escIndex == 1) {
+    // Check for modifier parameter sequences
+    // Format: ESC[n;mX or ESC[n;m~
+    // where n = key code, m = modifier (3=Alt, 5=Ctrl, 7=Ctrl+Alt)
+    int num = 0;
+    int modifier = 0;
+    bool hasModifier = false;
+    int i = 0;
+
+    // Parse first number
+    while (i < escIndex && escBuffer[i] >= '0' && escBuffer[i] <= '9') {
+      num = num * 10 + (escBuffer[i] - '0');
+      i++;
+    }
+
+    // Check for semicolon (modifier separator)
+    if (i < escIndex && escBuffer[i] == ';') {
+      i++;
+      hasModifier = true;
+      // Parse modifier number
+      while (i < escIndex && escBuffer[i] >= '0' && escBuffer[i] <= '9') {
+        modifier = modifier * 10 + (escBuffer[i] - '0');
+        i++;
+      }
+    }
+
+    // Set modifier flags based on modifier value
+    if (hasModifier) {
+      // Standard xterm modifiers: 2=Shift, 3=Alt, 5=Ctrl, 7=Ctrl+Alt
+      if (modifier == 3 || modifier == 7) parseAltMod = true;
+      if (modifier == 5 || modifier == 7) parseCtrlMod = true;
+      if (modifier == 2) parseShiftMod = true;
+    }
+
+    // Arrow keys: ESC[A, ESC[B, ESC[C, ESC[D (no modifiers)
+    if (escIndex == 1 && !hasModifier) {
       switch (escBuffer[0]) {
         case 'A': return 0x48;  // Up arrow
         case 'B': return 0x50;  // Down arrow
@@ -472,18 +591,30 @@ uint8_t parseEscapeSequence() {
       }
     }
 
-    // Extended keys: ESC[n~
-    if (escIndex >= 2 && escBuffer[escIndex-1] == '~') {
-      // Extract the number
-      int num = 0;
-      for (int i = 0; i < escIndex - 1; i++) {
-        if (escBuffer[i] >= '0' && escBuffer[i] <= '9') {
-          num = num * 10 + (escBuffer[i] - '0');
-        }
+    // CSI sequences with modifiers: ESC[1;5P (Ctrl+F1)
+    if (hasModifier && i < escIndex) {
+      char terminator = escBuffer[i];
+      switch (terminator) {
+        case 'P': return 0x3B;  // F1
+        case 'Q': return 0x3C;  // F2
+        case 'R': return 0x3D;  // F3
+        case 'S': return 0x3E;  // F4
+        case 'A': return 0x48;  // Up arrow
+        case 'B': return 0x50;  // Down arrow
+        case 'C': return 0x4D;  // Right arrow
+        case 'D': return 0x4B;  // Left arrow
       }
+    }
 
+    // Extended keys: ESC[n~ or ESC[n;m~
+    if (escIndex >= 2 && escBuffer[escIndex-1] == '~') {
       Serial.print("CSI num: ");
-      Serial.println(num);
+      Serial.print(num);
+      if (hasModifier) {
+        Serial.print(" modifier: ");
+        Serial.print(modifier);
+      }
+      Serial.println();
 
       switch (num) {
         case 1: return 0x47;   // Home

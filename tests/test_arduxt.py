@@ -292,7 +292,114 @@ def run_test_suite(tester: ArduXTTester):
                 use_raw_bytes=True, delay=0.2)
 
     # ===================================================================
-    # Alt Key Tests
+    # Alt+Function Key Tests
+    # ===================================================================
+    print("--- Alt+Function Key Tests ---\n")
+
+    # Alt+F1 through Alt+F4 (SS3 sequences)
+    tester.test("Alt+F1", b'\x1b\x1bOP', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F2", b'\x1b\x1bOQ', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F3", b'\x1b\x1bOR', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F4", b'\x1b\x1bOS', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+
+    # Alt+F5 through Alt+F12 (CSI sequences with modifier)
+    tester.test("Alt+F5", b'\x1b[15;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F6", b'\x1b[17;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F7", b'\x1b[18;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F8", b'\x1b[19;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F9", b'\x1b[20;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F10", b'\x1b[21;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F11", b'\x1b[23;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Alt+F12", b'\x1b[24;3~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+
+    # ===================================================================
+    # Ctrl+Function Key Tests
+    # ===================================================================
+    print("--- Ctrl+Function Key Tests ---\n")
+
+    # Ctrl+F1 through Ctrl+F4 (CSI sequences with modifier)
+    tester.test("Ctrl+F1", b'\x1b[1;5P', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F2", b'\x1b[1;5Q', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F3", b'\x1b[1;5R', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F4", b'\x1b[1;5S', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+
+    # Ctrl+F5 through Ctrl+F12 (CSI sequences with modifier)
+    tester.test("Ctrl+F5", b'\x1b[15;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F6", b'\x1b[17;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F7", b'\x1b[18;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F8", b'\x1b[19;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F9", b'\x1b[20;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F10", b'\x1b[21;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F11", b'\x1b[23;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+F12", b'\x1b[24;5~', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+
+    # ===================================================================
+    # Ctrl+Alt Combination Tests
+    # ===================================================================
+    print("--- Ctrl+Alt Combination Tests ---\n")
+
+    # Ctrl+Alt+letter combinations (ESC followed by Ctrl+letter)
+    tester.test("Ctrl+Alt+A", b'\x1b\x01', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+Alt+C", b'\x1b\x03', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+Alt+D", b'\x1b\x04', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Ctrl+Alt+Z", b'\x1b\x1A', ["ESC received"],
+                use_raw_bytes=True, delay=0.2)
+
+    # ===================================================================
+    # Shift+Ctrl Combination Tests
+    # ===================================================================
+    print("--- Shift+Ctrl Combination Tests ---\n")
+
+    # Shift+Ctrl+letter combinations (typically same as Ctrl+letter)
+    tester.test("Shift+Ctrl+A", b'\x01', ["INPUT: 0x1", "KEY: Ctrl+a"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Shift+Ctrl+C", b'\x03', ["INPUT: 0x3", "KEY: Ctrl+c"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Shift+Ctrl+Z", b'\x1A', ["INPUT: 0x1A", "KEY: Ctrl+z"],
+                use_raw_bytes=True, delay=0.2)
+
+    # ===================================================================
+    # Shift+Alt Combination Tests
+    # ===================================================================
+    print("--- Shift+Alt Combination Tests ---\n")
+
+    # Shift+Alt+letter combinations (ESC followed by uppercase letter)
+    tester.test("Shift+Alt+A", b'\x1bA', ["ESC received", "KEY: Alt+A"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Shift+Alt+Z", b'\x1bZ', ["ESC received", "KEY: Alt+Z"],
+                use_raw_bytes=True, delay=0.2)
+    tester.test("Shift+Alt+1 (!)", b'\x1b!', ["ESC received", "KEY: Alt+!"],
+                use_raw_bytes=True, delay=0.2)
+
+    # ===================================================================
+    # Alt Key Tests (Basic)
     # ===================================================================
     print("--- Alt Key Tests (ESC+char) ---\n")
 
@@ -329,9 +436,9 @@ def run_test_suite(tester: ArduXTTester):
                 ["ESC received", "CSI sequence", "ERROR: Unknown escape sequence"],
                 use_raw_bytes=True, delay=0.2)
 
-    # Invalid escape sequence
-    tester.test("Invalid sequence ESC+control char", b'\x1b\x01',
-                ["ESC received", "ERROR: Invalid ESC sequence"],
+    # Ctrl+Alt+A sequence (now valid)
+    tester.test("Ctrl+Alt+A via ESC+Ctrl code", b'\x1b\x01',
+                ["ESC received", "KEY: Ctrl+Alt+a"],
                 use_raw_bytes=True, delay=0.2)
 
 
