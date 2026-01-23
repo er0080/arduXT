@@ -15,72 +15,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Compilation and Upload
 
-#### Production Build (Default)
-```bash
-# Compile for production (no debug output, GPIO enabled)
-arduino-cli compile --fqbn arduino:avr:leonardo .
-
-# Upload to DFRobot Beetle
-arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
-
-# Compile and upload in one command
-arduino-cli compile --fqbn arduino:avr:leonardo . && \
-  arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
-```
-
-#### Debug/Testing Builds
-Use compile-time flags to enable debug features **without modifying source code**:
-
-```bash
-# Verbose mode: Enable scancode debug output (MAKE/BREAK for each key)
-arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES" .
-
-# Test mode: Disable GPIO operations for serial testing without hardware
-arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE" .
-
-# Both modes: Test mode + Verbose output (for hardware-in-the-loop tests)
-arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE -DVERBOSE_SCANCODES" .
-
-# Compile and upload with verbose mode
-arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES" . && \
-  arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo .
-```
-
-**Build Modes:**
-- **Production** (default): Minimal serial output, GPIO active, ready for PC/XT connection
-- **VERBOSE_SCANCODES**: Adds detailed scancode debug output (MAKE/BREAK for every key)
-- **ARDUXT_TEST_MODE**: Disables GPIO operations for faster serial testing without physical XT hardware
-- **ARDUXT_TEST_MODE + VERBOSE_SCANCODES**: Used by automated test suite
-
-**IMPORTANT**: Never uncomment `#define ARDUXT_TEST_MODE` or `#define VERBOSE_SCANCODES` in source code. Always use compile-time flags to prevent accidentally uploading test/debug code to production hardware.
-
-#### Build Helper Script
-
-For convenience, use the `build.sh` script:
+**Recommended**: Use the `build.sh` helper script for all builds:
 
 ```bash
 # Make script executable (first time only)
 chmod +x build.sh
 
-# Production build
+# Production build (default - no debug output, GPIO enabled)
 ./build.sh /dev/ttyACM0
 
-# Verbose mode (with scancode debug output)
+# Verbose mode (adds scancode debug output)
 ./build.sh /dev/ttyACM0 verbose
 
-# Test mode (for serial testing without hardware)
+# Test mode (disables GPIO for testing without hardware)
 ./build.sh /dev/ttyACM0 test
 
 # Test + verbose (for automated test suite)
 ./build.sh /dev/ttyACM0 test-verbose
 
-# Show help
+# Show all options
 ./build.sh --help
 ```
+
+**Build Modes:**
+- **Production** (default): Minimal serial output, GPIO active, ready for PC/XT connection
+- **verbose**: Adds detailed scancode debug output (MAKE/BREAK for every key)
+- **test**: Disables GPIO operations for serial testing without physical XT hardware
+- **test-verbose**: Both test mode and verbose output (used by automated test suite)
+
+**Manual Compilation** (if needed):
+```bash
+# Production build
+arduino-cli compile --fqbn arduino:avr:leonardo . && \
+  arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:leonardo .
+
+# With compile-time flags (verbose mode example)
+arduino-cli compile --fqbn arduino:avr:leonardo \
+  --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES" . && \
+  arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:leonardo .
+```
+
+**IMPORTANT**: Never uncomment `#define ARDUXT_TEST_MODE` or `#define VERBOSE_SCANCODES` in source code. Always use compile-time flags (via build.sh or --build-property) to prevent accidentally uploading test/debug code to production hardware.
 
 **Note**: On Apple Silicon (ARM64), the AVR toolchain lacks native support. Use an x64 platform or Docker/VM.
 
@@ -163,10 +138,18 @@ USB Serial Input → ASCII char → charToXTScancode() → Make code → sendXTS
 
 ### Adding New Scancodes
 
-To support additional keys, extend the `charToXTScancode()` function. Reference:
-- Function keys: F1 (0x3B) through F10 (0x44)
+To support additional keys, extend the `charToXTScancode()` or `parseEscapeSequence()` functions. Reference:
+- Function keys: F1 (0x3B) through F12 (0x58)
 - Cursor keys: Up (0x48), Down (0x50), Left (0x4B), Right (0x4D)
 - Modifiers: Left Shift (0x2A), Right Shift (0x36), Ctrl (0x1D), Alt (0x38)
+
+**Modifier Support**: The `parseEscapeSequence()` function parses CSI modifier parameters:
+- Modifier 2 = Shift
+- Modifier 3 = Alt
+- Modifier 5 = Ctrl
+- Modifier 7 = Ctrl+Alt
+
+The function sets global flags (`parseCtrlMod`, `parseAltMod`, `parseShiftMod`) that are checked when sending scancodes.
 
 ### Timing Adjustments
 
@@ -211,6 +194,24 @@ If you need to reassign pins:
 
 ## Testing
 
+### Automated Test Suite
+
+arduXT includes a comprehensive hardware-in-the-loop test suite with 97 tests:
+
+```bash
+# Build with test flags
+./build.sh /dev/ttyACM0 test-verbose
+
+# Run test suite
+cd tests/
+uv sync                                    # Install dependencies (first time)
+uv run test_arduxt.py /dev/ttyACM0         # Run tests
+```
+
+**Test Coverage**: Basic characters, punctuation, control sequences (Ctrl+A-Z), function keys (F1-F12), modifiers (Alt+Fn, Ctrl+Fn, Ctrl+Alt+Fn), navigation keys, Alt combinations, and edge cases.
+
+See [tests/README.md](tests/README.md) for full documentation.
+
 ### Manual Testing
 
 1. Upload sketch to Beetle
@@ -237,6 +238,9 @@ Use a logic analyzer or oscilloscope to verify:
 # Check if Beetle is detected (appears as Leonardo)
 arduino-cli board list
 
+# Quick serial port check (safe, won't hang)
+./check_serial.sh /dev/ttyACM0
+
 # Verify core is installed
 arduino-cli core list
 
@@ -251,6 +255,7 @@ arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo . --verb
 - Beetle not detected: Try pressing reset button, then run upload within 8 seconds
 - Port disappears: Beetle enters bootloader briefly on connection
 - Upload fails: Verify power is 4.5-5V (not 6V or higher)
+- Serial reads hang: Use `check_serial.sh` utility instead of raw serial commands
 
 ## Project Structure
 
@@ -258,8 +263,15 @@ arduino-cli upload -p /dev/cu.usbmodem14101 --fqbn arduino:avr:leonardo . --verb
 arduXT/
 ├── .gitignore          # Git ignore patterns
 ├── arduXT.ino          # Main sketch (all code in one file)
-├── CLAUDE.md           # This file
-└── README.md           # User documentation, wiring diagrams
+├── build.sh            # Build helper script for different modes
+├── check_serial.sh     # Serial port testing utility
+├── CLAUDE.md           # This file (developer/Claude guidance)
+├── README.md           # User documentation, wiring diagrams
+└── tests/              # Hardware-in-the-loop test suite
+    ├── test_arduxt.py  # Python test harness (97 tests)
+    ├── pyproject.toml  # uv package configuration
+    ├── uv.lock         # Dependency lockfile
+    └── README.md       # Test suite documentation
 ```
 
 This project uses a single-file Arduino sketch architecture. For future expansion with multiple files:
