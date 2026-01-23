@@ -46,13 +46,13 @@ function build_verbose() {
 function build_test() {
     echo "🔨 Building: TEST MODE (no GPIO)"
     arduino-cli compile --fqbn "$FQBN" \
-        --build-property "compiler.cpp.extra_flags=-DTEST_MODE" .
+        --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE" .
 }
 
 function build_test_verbose() {
     echo "🔨 Building: TEST + VERBOSE (for automated tests)"
     arduino-cli compile --fqbn "$FQBN" \
-        --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" .
+        --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE -DVERBOSE_SCANCODES" .
 }
 
 function upload() {

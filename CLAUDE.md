@@ -38,11 +38,11 @@ arduino-cli compile --fqbn arduino:avr:leonardo \
 
 # Test mode: Disable GPIO operations for serial testing without hardware
 arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DTEST_MODE" .
+  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE" .
 
 # Both modes: Test mode + Verbose output (for hardware-in-the-loop tests)
 arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" .
+  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE -DVERBOSE_SCANCODES" .
 
 # Compile and upload with verbose mode
 arduino-cli compile --fqbn arduino:avr:leonardo \
@@ -53,10 +53,10 @@ arduino-cli compile --fqbn arduino:avr:leonardo \
 **Build Modes:**
 - **Production** (default): Minimal serial output, GPIO active, ready for PC/XT connection
 - **VERBOSE_SCANCODES**: Adds detailed scancode debug output (MAKE/BREAK for every key)
-- **TEST_MODE**: Disables GPIO operations for faster serial testing without physical XT hardware
-- **TEST_MODE + VERBOSE_SCANCODES**: Used by automated test suite
+- **ARDUXT_TEST_MODE**: Disables GPIO operations for faster serial testing without physical XT hardware
+- **ARDUXT_TEST_MODE + VERBOSE_SCANCODES**: Used by automated test suite
 
-**IMPORTANT**: Never uncomment `#define TEST_MODE` or `#define VERBOSE_SCANCODES` in source code. Always use compile-time flags to prevent accidentally uploading test/debug code to production hardware.
+**IMPORTANT**: Never uncomment `#define ARDUXT_TEST_MODE` or `#define VERBOSE_SCANCODES` in source code. Always use compile-time flags to prevent accidentally uploading test/debug code to production hardware.
 
 #### Build Helper Script
 

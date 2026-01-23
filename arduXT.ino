@@ -29,19 +29,19 @@
 // Instead, pass them at compile time using --build-property:
 //
 // Test mode (no GPIO, faster serial testing):
-//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DTEST_MODE"
+//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE"
 //
 // Verbose mode (scancode debug output):
 //   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DVERBOSE_SCANCODES"
 //
 // Both modes:
-//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES"
+//   arduino-cli compile --fqbn arduino:avr:leonardo --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE -DVERBOSE_SCANCODES"
 //
 // Production build (no flags):
 //   arduino-cli compile --fqbn arduino:avr:leonardo
 //
 // WARNING: Do not uncomment these in source - use compile-time flags instead!
-// #define TEST_MODE
+// #define ARDUXT_TEST_MODE
 // #define VERBOSE_SCANCODES
 
 // Escape sequence parser state machine
@@ -71,7 +71,7 @@ bool parseShiftMod = false;
 #define SC_ALT     0x38
 
 void setup() {
-#ifndef TEST_MODE
+#ifndef ARDUXT_TEST_MODE
   // Initialize GPIO pins for XT keyboard interface
   pinMode(XT_CLK_PIN, OUTPUT);
   pinMode(XT_DATA_PIN, OUTPUT);
@@ -90,8 +90,8 @@ void setup() {
   }
 
   Serial.println("arduXT - XT Keyboard Emulator");
-#ifdef TEST_MODE
-  Serial.println("TEST MODE: GPIO operations disabled");
+#ifdef ARDUXT_TEST_MODE
+  Serial.println("ARDUXT_TEST_MODE: GPIO operations disabled");
 #endif
 #ifdef VERBOSE_SCANCODES
   Serial.println("VERBOSE MODE: Scancode output enabled");
@@ -363,7 +363,7 @@ void sendXTScancode(uint8_t scancode) {
   Serial.println(")");
 #endif
 
-#ifndef TEST_MODE
+#ifndef ARDUXT_TEST_MODE
   // Start bit (DATA high)
   digitalWrite(XT_DATA_PIN, HIGH);
   xtClockPulse();
@@ -385,7 +385,7 @@ void sendXTScancode(uint8_t scancode) {
  * Clock idles HIGH, pulses LOW
  */
 void xtClockPulse() {
-#ifndef TEST_MODE
+#ifndef ARDUXT_TEST_MODE
   delayMicroseconds(XT_CLK_HALF_PERIOD);
   digitalWrite(XT_CLK_PIN, LOW);
   delayMicroseconds(XT_CLK_HALF_PERIOD);

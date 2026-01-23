@@ -34,21 +34,21 @@ uv sync
 # Navigate to project root
 cd /home/eric/dev/arduXT
 
-# Compile with TEST_MODE and VERBOSE_SCANCODES enabled
+# Compile with ARDUXT_TEST_MODE and VERBOSE_SCANCODES enabled
 arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" .
+  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE -DVERBOSE_SCANCODES" .
 
 # Upload to device
 arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:leonardo .
 
 # Or combine both commands
 arduino-cli compile --fqbn arduino:avr:leonardo \
-  --build-property "compiler.cpp.extra_flags=-DTEST_MODE -DVERBOSE_SCANCODES" . && \
+  --build-property "compiler.cpp.extra_flags=-DARDUXT_TEST_MODE -DVERBOSE_SCANCODES" . && \
   arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:leonardo .
 ```
 
 **Why these flags are needed:**
-- **TEST_MODE**: Disables GPIO operations, allowing tests to run faster without physical XT hardware
+- **ARDUXT_TEST_MODE**: Disables GPIO operations, allowing tests to run faster without physical XT hardware
 - **VERBOSE_SCANCODES**: Outputs detailed scancode information (MAKE/BREAK) that the test suite validates
 
 **NEVER uncomment these defines in source code** - always pass them at compile time to prevent accidentally deploying test code to production.
@@ -158,10 +158,10 @@ Prints detailed scancode information for each key press:
 ```
 Output includes MAKE/BREAK codes being sent to the XT bus.
 
-### TEST_MODE (disabled by default)
+### ARDUXT_TEST_MODE (disabled by default)
 Disables GPIO operations for faster testing without hardware:
 ```cpp
-#define TEST_MODE
+#define ARDUXT_TEST_MODE
 ```
 When enabled:
 - No GPIO pin initialization
