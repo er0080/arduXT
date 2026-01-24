@@ -434,6 +434,75 @@ Common failure patterns:
 - **Key-type specific**: Certain key types (e.g., function, navigation) fail more
 - **Failures after long runs**: Potential memory leaks or buffer management issues
 
+## Stress Testing Results
+
+The fuzzer has been tested at various inter-keystroke delays to validate system performance under stress. Tests were conducted in two modes:
+
+1. **Test Mode** (XT disabled): GPIO operations disabled via `ARDUXT_TEST_MODE` flag for baseline performance
+2. **XT Active** (XT enabled): Full GPIO signaling enabled with `VERBOSE_SCANCODES` only (production mode)
+
+### Test Mode Results (XT Signaling Disabled)
+
+| Delay | Inputs | Success Rate | Failures | Throughput | Result |
+|-------|--------|--------------|----------|------------|---------|
+| 75ms (default) | 3141 | 100.00% | 0 | 6.43/s | ✅ Perfect |
+| 50ms | 941 | 100.00% | 0 | 7.71/s | ✅ Perfect |
+| 25ms | 1172 | 100.00% | 0 | 9.60/s | ✅ Perfect |
+| 10ms | 1381 | 100.00% | 0 | 11.32/s | ✅ Perfect |
+| 5ms | 1508 | 99.93% | 1 | 12.36/s | ⚠️ Marginal |
+
+**Total test volume**: 8,143 inputs with 1 failure
+
+### XT Active Results (Full GPIO Signaling Enabled)
+
+| Delay | Inputs | Success Rate | Failures | Throughput | Result |
+|-------|--------|--------------|----------|------------|---------|
+| 75ms (default) | 785 | 100.00% | 0 | 6.43/s | ✅ Perfect |
+| 50ms | 940 | 100.00% | 0 | 7.70/s | ✅ Perfect |
+| 25ms | 1170 | 99.91% | 1 | 9.58/s | ⚠️ Marginal |
+| 10ms | 1408 | 99.93% | 1 | 11.53/s | ⚠️ Marginal |
+| 5ms | 1559 | 99.68% | 5 | 12.78/s | ⚠️ Stressed |
+
+**Total test volume**: 5,862 inputs with 8 failures
+
+### Key Findings
+
+1. **Production-Ready at Default Speed**: Both 75ms and 50ms delays achieve 100% success with full XT GPIO signaling
+2. **No Buffering Issues**: Arduino's 64-byte serial buffer handles normal operating speeds perfectly
+3. **GPIO Overhead is Minimal**: XT transmission (~720μs per scancode) doesn't impact reliability at normal speeds
+4. **Stress Test Limits**: Failures only appear at extreme speeds (≤25ms delay) approaching theoretical limits
+5. **Consistent Performance**: Response times remain stable (~77ms average) across all test conditions
+
+### Production Recommendations
+
+- **Default (75ms delay)**: Conservative, proven 100% reliable in all tests
+- **Optimized (50ms delay)**: 20% higher throughput with 100% reliability
+- **Stress Testing**: System validated with 13,805 total inputs across all test conditions
+
+### Running Stress Tests
+
+```bash
+# Build with XT signaling active (production mode)
+cd ..
+./build.sh /dev/ttyACM0 verbose
+
+# Run stress test with custom delay (50ms example)
+cd tests/
+uv run fuzz_arduxt.py /dev/ttyACM0 --duration 120 --delay 0.050 \
+  --report stats_50ms.json --failures failures_50ms.json
+
+# Build with XT disabled (test mode for baseline)
+cd ..
+./build.sh /dev/ttyACM0 test-verbose
+
+# Run baseline stress test
+cd tests/
+uv run fuzz_arduxt.py /dev/ttyACM0 --duration 120 --delay 0.050 \
+  --report stats_50ms_test.json --failures failures_50ms_test.json
+```
+
+**Note**: The `--delay` parameter controls inter-keystroke delay in seconds. The default (0.075 = 75ms) provides optimal reliability for production use.
+
 ## Troubleshooting
 
 **Device not found:**

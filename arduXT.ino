@@ -125,6 +125,18 @@ void loop() {
       // Standalone ESC key pressed
       Serial.println("KEY: ESC (standalone)");
       sendKey(0x01);  // ESC scancode
+    } else if (escState == STATE_CSI && escIndex == 0) {
+      // ESC [ with no following data = Alt+[
+      // This is an ambiguity: ESC [ starts CSI sequences, but also represents Alt+[
+      Serial.println("KEY: Alt+[");
+      uint8_t baseCode = charToXTScancode('[');
+      if (baseCode != 0) {
+        sendXTScancode(SC_ALT);
+        sendXTScancode(baseCode);
+        delay(KEY_PRESS_DURATION);
+        sendXTScancode(baseCode | 0x80);
+        sendXTScancode(SC_ALT | 0x80);
+      }
     } else {
       Serial.println("ERROR: Escape sequence timeout");
     }
@@ -640,6 +652,8 @@ uint8_t parseEscapeSequence() {
         case 'B': return 0x50;  // Down arrow
         case 'C': return 0x4D;  // Right arrow
         case 'D': return 0x4B;  // Left arrow
+        case 'H': return 0x47;  // Home
+        case 'F': return 0x4F;  // End
       }
     }
 
